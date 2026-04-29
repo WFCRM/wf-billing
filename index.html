@@ -379,63 +379,115 @@ const SKIP_TYPES = ['Internal(ไม่เปิดบิล)','Internal'];
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzIECCH9jQhFHEFbUNsnlldr78dI2J6Gjvvw2fP0Te9XyrWoC6KlIZ3kUTZ8ONylhVMFA/exec';
 
 // ─── Account Mapping → ชื่อบนใบกำกับ Flowaccount ────────────
+// Source of truth: แอคเคา_mapping_ชื่อบนใบกำกับ.xlsx
+// Flash ใช้ format CZ-xxx ในไฟล์, เก็บทั้ง CZ-xxx และ CZ0108-xxx เพื่อ match ได้ทุกกรณี
 const ACCOUNT_MAPPING = {
-  '80022597': { flowName: 'บริษัท ฮาบิบ โค ฟูลฟิลล์เม้นท์ จำกัด' },
-  '80027576': { flowName: 'บริษัท จริงจังฟุตบอล จำกัด' },
-  '80020320': { flowName: 'บริษัท เอ็น.ที.บี อินเตอร์เนชั่นแนล จำกัด' },
-  '80027005': { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
-  '80027287': { flowName: 'บริษัท ซอร์ทเอาท์ จำกัด' },
-  '5403028':  { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
-  '80021666': { flowName: 'บริษัท ทรานสปีด จำกัด' },
-  '80027773': { flowName: 'บริษัท ไลน์ฮอลล์ เอ็กซ์เพรส (ประเทศไทย) จำกัด' },
-  '80030479': { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
-  '80027092': { flowName: 'ร้าน ธีริทธิ์ Auto Part' },
-  'CZ0108-165': { flowName: 'นางสาวสุชาดา โคตรสุวรรณ' },
-  'CZ0108-142': { flowName: 'นายธนากร ธเนศกุลบุตร' },
-  'CZ0108-107': { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
-  'CZ0108-188': { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
-  'CZ0108-108': { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
-  'CZ0108-186': { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
-  'CZ0108-166': { flowName: 'บริษัท ธีระวรา มหาเฮง กรุ๊ป 888 จำกัด' },
-  'CZ0108-128': { flowName: 'บริษัท นูยู จำกัด' },
-  'CZ0108-130': { flowName: 'บริษัท พีพี สตูดิโอ17 จำกัด' },
-  'CZ0108-175': { flowName: 'บริษัท ยู เฟรท จำกัด' },
-  'CZ0108-160': { flowName: 'บริษัท รวยหมื่นปี 888 จำกัด' },
-  'CZ0108-162': { flowName: 'บริษัท อเด็คโก้ เพชรบุรีตัดใหม่ จำกัด' },
-  'CZ0108-93':  { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
-  'CZ0108-81':  { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
-  'CZ0108-178': { flowName: 'ร้าน Neo casePage' },
-  'CZ0108-49':  { flowName: 'ศักดินันท์ สุดรัก' },
-  'CZ0108-90':  { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
-  'CZ0108-154': { flowName: 'บริษัท แอดไวซ์มิชชั่น จำกัด' },
-  'CZ0108-33':  { flowName: 'ชมัยพร แก้วงอก' },
-  'CZ0108-13':  { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
-  'CZ0108-191': { flowName: 'บริษัท เจ็นเอ็นเอสอินเตอร์เทรด จำกัด' },
-  'CZ0108-61':  { flowName: 'บริษัท ดี.ลอยัล เอ็นเตอร์ไพรส์ จำกัด' },
-  'CZ0108-148': { flowName: 'บริษัท บิวตี้ไนน์ คอสเมติกส์ จำกัด' },
-  'CZ0108-158': { flowName: 'บริษัท เลิฟลี่ไนท์ จำกัด' },
-  'CZ0108-60':  { flowName: 'เฉลิมพล สาหรี่' },
-  'CZ0108-8':   { flowName: 'หจก.ถมทอง 955' },
-  'CZ0108-71':  { flowName: 'นายวุฒิพงษ์ ประจันโท' },
-  'CZ0108-53':  { flowName: 'นส.พรรคศม แซ่แต้' },
-  'CZ0108-74':  { flowName: 'คุณจิรกิตติ์ ศิริอำนาจ' },
-  'CZ0108-146': { flowName: 'นางสาวสุกัญญา หาญสงคราม' },
-  'CZ0108-54':  { flowName: 'นภัสสรณ์ คฤหพรพงศ์' },
-  'CZ0108-95':  { flowName: 'คุณกุลิสรา หงวน' },
-  'CZ0108-115': { flowName: 'คุณจันทิมา สร้อยเพชร' },
-  'CZ0108-44':  { flowName: 'บริษัท ริช ดีย์วา จำกัด' },
-  'WF1663': { flowName: 'บริษัท เหมียวช็อป คอสเมติก จำกัด' },
-  'WF1955': { flowName: 'บริษัท ริพเพิลส์คอมเมิร์ซ จำกัด' },
-  'WF238':  { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
+  // DHL
+  '80022597':     { flowName: 'บริษัท ฮาบิบ โค ฟูลฟิลล์เม้นท์ จำกัด' },
+  '80027576':     { flowName: 'บริษัท จริงจังฟุตบอล จำกัด' },
+  '80020320':     { flowName: 'บริษัท เอ็น.ที.บี อินเตอร์เนชั่นแนล จำกัด' },
+  '80027005':     { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
+  '80027287':     { flowName: 'บริษัท ซอร์ทเอาท์ จำกัด' },
+  '5403028':      { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
+  '80021666':     { flowName: 'บริษัท ทรานสปีด จำกัด' },
+  '80027773':     { flowName: 'บริษัท ไลน์ฮอลล์ เอ็กซ์เพรส (ประเทศไทย) จำกัด' },
+  '80030479':     { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
+  '80027092':     { flowName: 'ร้าน ธีริทธิ์ Auto Part' },
+  // Flash — เก็บทั้ง CZ-xxx (format ในไฟล์) และ CZ0108-xxx (format ใน Sheet)
+  'CZ-165':       { flowName: 'นางสาวสุชาดา โคตรสุวรรณ' },
+  'CZ0108-165':   { flowName: 'นางสาวสุชาดา โคตรสุวรรณ' },
+  'CZ-142':       { flowName: 'นายธนากร ธเนศกุลบุตร' },
+  'CZ0108-142':   { flowName: 'นายธนากร ธเนศกุลบุตร' },
+  'CZ-107':       { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  'CZ0108-107':   { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  'CZ-188':       { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  'CZ0108-188':   { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  'CZ-108':       { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+  'CZ0108-108':   { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+  'CZ-186':       { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+  'CZ0108-186':   { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+  'CZ-166':       { flowName: 'บริษัท ธีระวรา มหาเฮง กรุ๊ป 888 จำกัด' },
+  'CZ0108-166':   { flowName: 'บริษัท ธีระวรา มหาเฮง กรุ๊ป 888 จำกัด' },
+  'CZ-128':       { flowName: 'บริษัท นูยู จำกัด' },
+  'CZ0108-128':   { flowName: 'บริษัท นูยู จำกัด' },
+  'CZ-130':       { flowName: 'บริษัท พีพี สตูดิโอ17 จำกัด' },
+  'CZ0108-130':   { flowName: 'บริษัท พีพี สตูดิโอ17 จำกัด' },
+  'CZ-175':       { flowName: 'บริษัท ยู เฟรท จำกัด' },
+  'CZ0108-175':   { flowName: 'บริษัท ยู เฟรท จำกัด' },
+  'CZ-160':       { flowName: 'บริษัท รวยหมื่นปี 888 จำกัด' },
+  'CZ0108-160':   { flowName: 'บริษัท รวยหมื่นปี 888 จำกัด' },
+  'CZ-162':       { flowName: 'บริษัท อเด็คโก้ เพชรบุรีตัดใหม่ จำกัด' },
+  'CZ0108-162':   { flowName: 'บริษัท อเด็คโก้ เพชรบุรีตัดใหม่ จำกัด' },
+  'CZ-93':        { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
+  'CZ0108-93':    { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
+  'CZ-81':        { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
+  'CZ0108-81':    { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
+  'CZ-178':       { flowName: 'ร้าน Neo casePage' },
+  'CZ0108-178':   { flowName: 'ร้าน Neo casePage' },
+  'CZ-49':        { flowName: 'ศักดินันท์ สุดรัก' },
+  'CZ0108-49':    { flowName: 'ศักดินันท์ สุดรัก' },
+  'CZ-90':        { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
+  'CZ0108-90':    { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
+  'CZ-154':       { flowName: 'บริษัท แอดไวซ์มิชชั่น จำกัด' },
+  'CZ0108-154':   { flowName: 'บริษัท แอดไวซ์มิชชั่น จำกัด' },
+  'CZ-33':        { flowName: 'ชมัยพร แก้วงอก' },
+  'CZ0108-33':    { flowName: 'ชมัยพร แก้วงอก' },
+  'CZ-13':        { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
+  'CZ0108-13':    { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
+  'CZ-191':       { flowName: 'บริษัท เจ็นเอ็นเอสอินเตอร์เทรด จำกัด' },
+  'CZ0108-191':   { flowName: 'บริษัท เจ็นเอ็นเอสอินเตอร์เทรด จำกัด' },
+  'CZ-61':        { flowName: 'บริษัท ดี.ลอยัล เอ็นเตอร์ไพรส์ จำกัด' },
+  'CZ0108-61':    { flowName: 'บริษัท ดี.ลอยัล เอ็นเตอร์ไพรส์ จำกัด' },
+  'CZ-148':       { flowName: 'บริษัท บิวตี้ไนน์ คอสเมติกส์ จำกัด' },
+  'CZ0108-148':   { flowName: 'บริษัท บิวตี้ไนน์ คอสเมติกส์ จำกัด' },
+  'CZ-158':       { flowName: 'บริษัท เลิฟลี่ไนท์ จำกัด' },
+  'CZ0108-158':   { flowName: 'บริษัท เลิฟลี่ไนท์ จำกัด' },
+  'CZ-60':        { flowName: 'เฉลิมพล สาหรี่' },
+  'CZ0108-60':    { flowName: 'เฉลิมพล สาหรี่' },
+  'CZ-8':         { flowName: 'หจก.ถมทอง 955' },
+  'CZ0108-8':     { flowName: 'หจก.ถมทอง 955' },
+  'CZ-71':        { flowName: 'นายวุฒิพงษ์ ประจันโท' },
+  'CZ0108-71':    { flowName: 'นายวุฒิพงษ์ ประจันโท' },
+  'CZ-53':        { flowName: 'นส.พรรคศม แซ่แต้' },
+  'CZ0108-53':    { flowName: 'นส.พรรคศม แซ่แต้' },
+  'CZ-74':        { flowName: 'คุณจิรกิตติ์ ศิริอำนาจ' },
+  'CZ0108-74':    { flowName: 'คุณจิรกิตติ์ ศิริอำนาจ' },
+  'CZ-146':       { flowName: 'นางสาวสุกัญญา หาญสงคราม' },
+  'CZ0108-146':   { flowName: 'นางสาวสุกัญญา หาญสงคราม' },
+  'CZ-54':        { flowName: 'นภัสสรณ์ คฤหพรพงศ์' },
+  'CZ0108-54':    { flowName: 'นภัสสรณ์ คฤหพรพงศ์' },
+  'CZ-95':        { flowName: 'คุณกุลิสรา หงวน' },
+  'CZ0108-95':    { flowName: 'คุณกุลิสรา หงวน' },
+  'CZ-115':       { flowName: 'คุณจันทิมา สร้อยเพชร' },
+  'CZ0108-115':   { flowName: 'คุณจันทิมา สร้อยเพชร' },
+  'CZ-44':        { flowName: 'บริษัท ริช ดีย์วา จำกัด' },
+  'CZ0108-44':    { flowName: 'บริษัท ริช ดีย์วา จำกัด' },
+  // WefastD
+  'WF1663':       { flowName: 'บริษัท เหมียวช็อป คอสเมติก จำกัด' },
+  'WF1955':       { flowName: 'บริษัท ริพเพิลส์คอมเมิร์ซ จำกัด' },
+  'WF238':        { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
+  // SPX
   '1648547605-1': { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
   '1648547605-2': { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
 };
 
 function getFlowName(subAcc) {
-  // normalize CZ-xxx → CZ0108-xxx
-  let acc = String(subAcc).trim();
-  if (/^CZ-\d+/.test(acc)) acc = 'CZ0108-' + acc.replace('CZ-','');
-  return ACCOUNT_MAPPING[acc]?.flowName || acc;
+  const acc = String(subAcc).trim();
+  // 1. ลอง ACCOUNT_MAPPING ตรงๆ ก่อน (map ครอบคลุมทั้ง CZ-xxx และ CZ0108-xxx แล้ว)
+  if (ACCOUNT_MAPPING[acc]?.flowName) return ACCOUNT_MAPPING[acc].flowName;
+  // 2. normalize แล้วลองอีกครั้ง
+  if (/^CZ-\d+/.test(acc)) {
+    const norm = 'CZ0108-' + acc.replace('CZ-','');
+    if (ACCOUNT_MAPPING[norm]?.flowName) return ACCOUNT_MAPPING[norm].flowName;
+  }
+  if (/^CZ0108-\d+/.test(acc)) {
+    const norm = 'CZ-' + acc.replace('CZ0108-','');
+    if (ACCOUNT_MAPPING[norm]?.flowName) return ACCOUNT_MAPPING[norm].flowName;
+  }
+  // 3. fallback: ใช้ชื่อจาก CustomerTypes Sheet (ตัดเลขนำหน้าแล้ว)
+  const ct = state.customerTypes[acc];
+  if (ct?.name) return ct.name;
+  return acc;
 }
 
 let state = {
@@ -630,9 +682,18 @@ async function loadCustomersFromSheet() {
     const data = await resp.json();
     console.log('GAS getCustomers raw:', JSON.stringify(data).slice(0, 500));
     if (data.ok && data.customers && Object.keys(data.customers).length > 0) {
-      state.customerTypes = data.customers;
+      // ตัดเลขนำหน้าชื่อออก เช่น "13บริษัท..." → "บริษัท..."
+      const cleaned = {};
+      Object.entries(data.customers).forEach(([acc, v]) => {
+        cleaned[acc] = {
+          name: (v.name || '').replace(/^\d+/, '').trim(),
+          type: v.type || '',
+        };
+      });
+      state.customerTypes = cleaned;
       state.customersLoaded = true;
-      console.log('โหลด CustomerTypes จาก Sheet:', Object.keys(data.customers).length, 'accounts');
+      console.log('โหลด CustomerTypes จาก Sheet:', Object.keys(cleaned).length, 'accounts');
+      console.log('ตัวอย่าง:', JSON.stringify(Object.entries(cleaned).slice(0,3)));
     } else {
       // ไม่มีข้อมูลใน Sheet ก็ยังให้ใช้งานได้ (ใช้ค่า default เงินสด)
       state.customersLoaded = true;
