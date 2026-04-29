@@ -289,20 +289,20 @@ input[type=file] { display: none; }
   </div>
   <div class="nav">
     <div class="nav-section">รายรับ</div>
-    <div class="nav-item" onclick="showPage('overview')">
+    <div class="nav-item" onclick="showPage('overview',this)">
       <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="9" y="1" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="9" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/></svg>
       ภาพรวม
     </div>
-    <div class="nav-item active" onclick="showPage('upload')">
+    <div class="nav-item active" onclick="showPage('upload',this)">
       <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5v8M4 5l3.5-3.5L11 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 11v2a1 1 0 001 1h11a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       อัปโหลดไฟล์
     </div>
-    <div class="nav-item" onclick="showPage('bills')">
+    <div class="nav-item" onclick="showPage('bills',this)">
       <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="1.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.1"/><path d="M1 5h13" stroke="currentColor" stroke-width="1.1"/><path d="M4 8h4M4 11h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
       รายการเปิดบิลวันนี้
       <span class="nav-badge" id="bill-count">0</span>
     </div>
-    <div class="nav-item" onclick="showPage('tracking')">
+    <div class="nav-item" onclick="showPage('tracking',this)">
       <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.1"/><path d="M7.5 4.5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
       ติดตามค้างชำระ
     </div>
@@ -475,10 +475,17 @@ function init() {
 }
 
 // ─── Page routing ─────────────────────────────────────────────
-function showPage(page) {
+function showPage(page, el) {
   state.currentPage = page;
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  event?.currentTarget?.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else {
+    // highlight nav item ที่ตรงกับ page
+    const navItems = document.querySelectorAll('.nav-item');
+    const pageIdx = {overview:0,upload:1,bills:2,tracking:3};
+    if (pageIdx[page] !== undefined && navItems[pageIdx[page]])
+      navItems[pageIdx[page]].classList.add('active');
+  }
   const titles = {
     overview: ['ภาพรวม','สถานะการเปิดบิลประจำวัน'],
     upload:   ['อัปโหลดไฟล์รายงาน','เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ'],
@@ -550,7 +557,7 @@ function renderUpload() {
 
   const readyCount = Object.keys(state.files).length;
   const alertHtml  = state.bills.length > 0
-    ? `<div class="alert alert-green"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#057a55"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>คำนวณเสร็จแล้ว — พบ <strong>${state.bills.length} รายการ</strong> ที่ต้องเปิดบิลวันนี้ <button class="btn btn-sm btn-green" style="margin-left:auto" onclick="showPage('bills')">ดูรายการ →</button></div>`
+    ? `<div class="alert alert-green"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#057a55"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>คำนวณเสร็จแล้ว — พบ <strong>${state.bills.length} รายการ</strong> ที่ต้องเปิดบิลวันนี้ <button class="btn btn-sm btn-green" style="margin-left:auto" onclick="showPage('bills',this)">ดูรายการ →</button></div>`
     : readyCount >= 1
     ? `<div class="alert alert-blue"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#1a56db"/><path d="M7 4.5v4M7 9.5v.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>อัปโหลดไฟล์แล้ว ${readyCount} ไฟล์ — กดปุ่ม "คำนวณรายการ" ด้านบนขวาได้เลยครับ</div>`
     : `<div class="alert alert-amber"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#EF9F27"/><path d="M7 4v4M7 9.5v.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>กรุณาอัปโหลดไฟล์อย่างน้อย 1 ไฟล์ก่อน</div>`;
@@ -919,7 +926,7 @@ function renderBills() {
     return `<div class="card"><div class="empty">
       <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="4" width="28" height="28" rx="4" stroke="currentColor" stroke-width="1.5"/><path d="M12 18h12M18 12v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       ยังไม่มีรายการ — กรุณาอัปโหลดไฟล์และกดคำนวณก่อนครับ
-      <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload')">ไปอัปโหลดไฟล์</button>
+      <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload',this)">ไปอัปโหลดไฟล์</button>
     </div></div>`;
   }
 
@@ -1118,7 +1125,7 @@ async function markPaid(invNo, carrier) {
 function renderOverview() {
   return `<div class="card"><div class="empty">
     กด "อัปโหลดไฟล์" เพื่อเริ่มต้นใช้งานครับ
-    <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload')">เริ่มต้น →</button>
+    <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload',this)">เริ่มต้น →</button>
   </div></div>`;
 }
 
