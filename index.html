@@ -1029,7 +1029,7 @@ async function renderTracking() {
 
   try {
     const carrier = state.trackingCarrier || 'Flash';
-    const resp = await fetch(GAS_URL + '?action=getTracking&carrier=' + encodeURIComponent(carrier));
+    const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({action:'getTracking',carrier})));
     const data = await resp.json();
     if (!data.ok) throw new Error(data.error);
 
@@ -1103,12 +1103,8 @@ async function markPaid(invNo, carrier) {
   const wht = prompt('หัก ณ ที่จ่าย (ถ้ามี ใส่ 0 ถ้าไม่มี):', '0');
 
   try {
-    const formData2 = new FormData();
-    formData2.append('data', JSON.stringify({ action: 'updatePayment', invNo, carrier, paidDate, paidAmount: parseFloat(paidAmount), wht: parseFloat(wht||0) }));
-    const resp = await fetch(GAS_URL, {
-      method: 'POST',
-      body: formData2,
-    });
+    const payload2 = encodeURIComponent(JSON.stringify({ action: 'updatePayment', invNo, carrier, paidDate, paidAmount: parseFloat(paidAmount), wht: parseFloat(wht||0) }));
+    const resp = await fetch(GAS_URL + '?data=' + payload2);
     const data = await resp.json();
     if (!data.ok) throw new Error(data.error);
     alert('บันทึกการชำระสำเร็จ!');
@@ -1200,12 +1196,9 @@ async function confirmBills() {
   if (btn) btn.innerHTML = '<div class="spinner"></div> กำลังเปิดบิล...';
 
   try {
-    const formData = new FormData();
-    formData.append('data', JSON.stringify({ action: 'saveBills', bills }));
-    const resp = await fetch(GAS_URL, {
-      method: 'POST',
-      body: formData,
-    });
+    // ส่งผ่าน GET URL parameter เพื่อหลีกเลี่ยง CORS preflight
+    const payload = encodeURIComponent(JSON.stringify({ action: 'saveBills', bills }));
+    const resp = await fetch(GAS_URL + '?data=' + payload);
     const data = await resp.json();
 
     if (!data.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
