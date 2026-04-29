@@ -1010,12 +1010,34 @@ function calculateBills() {
     return fmtDate(targetDates[0]) + '–' + fmtDate(targetDates[targetDates.length-1]);
   }
 
-  // ใช้ customerTypes ที่โหลดจากหน้า 'ข้อมูลลูกค้า'
-  // แปลง customerTypes {acc: {type,name}} → {acc: type} สำหรับ shouldBillToday
+  // ใช้ customerTypes ที่โหลดจาก Sheet CustomerTypes
+  // แปลง {acc: {type,name}} → {acc: type}
   const custTypeMap = {};
   Object.entries(state.customerTypes || {}).forEach(([acc, v]) => {
-    custTypeMap[acc] = typeof v === 'string' ? v : (v.type || '');
+    const t = typeof v === 'string' ? v : (v.type || '');
+    custTypeMap[acc.trim()] = t;
+    // normalize: CZ0108-13 → CZ-13 และ CZ-13 → CZ0108-13
+    if (acc.startsWith('CZ0108-')) custTypeMap['CZ-' + acc.replace('CZ0108-','')] = t;
+    if (/^CZ-\d+/.test(acc))      custTypeMap['CZ0108-' + acc.replace('CZ-','')] = t;
+    // normalize: CAZ3461-x ↔ CAZ3461-x (เก็บไว้ตรงๆ)
   });
+
+  // helper: lookup type โดย normalize key
+  function lookupType(acc, name) {
+    const a = String(acc || '').trim();
+    const n = String(name || '').trim();
+    // ลอง exact match ก่อน
+    if (custTypeMap[a]) return custTypeMap[a];
+    // normalize CZ-xxx ↔ CZ0108-xxx
+    if (/^CZ-\d+/.test(a))      return custTypeMap['CZ0108-' + a.replace('CZ-','')] || '';
+    if (/^CZ0108-\d+/.test(a))  return custTypeMap['CZ-' + a.replace('CZ0108-','')] || '';
+    // fallback: หา key ที่ name ตรงกัน
+    const byName = Object.entries(state.customerTypes || {}).find(([,v]) => {
+      const vName = typeof v === 'string' ? '' : (v.name || '');
+      return vName && n && vName.includes(n.slice(0,8));
+    });
+    return byName ? (typeof byName[1] === 'string' ? byName[1] : byName[1].type || '') : '';
+  }
 
   // parse ทุกไฟล์
   let rawBills = [];
@@ -1030,7 +1052,8 @@ function calculateBills() {
   const mergedGroups = {};
 
   for (const b of rawBills) {
-    const custType = b.overrideType || custTypeMap[b.acc] || custTypeMap[b.name] || '';
+    const custType = b.overrideType || lookupType(b.acc, b.name) || '';
+    console.log(`[lookup] acc="${b.acc}" name="${b.name}" → type="${custType}"`);
     if (SKIP_TYPES.some(s => custType.includes(s))) continue;
     if (!shouldBillToday(custType || 'เงินสด')) continue;
 
