@@ -571,7 +571,13 @@ function handleCustomerFile(evt) {
     // แทนที่ข้อมูลเดิมทั้งหมด
     state.customerTypes = map;
     state.customerPage  = 1;
-    alert('โหลดข้อมูลลูกค้าสำเร็จ: ' + Object.keys(map).length + ' accounts');
+    // save ลง Google Sheet
+    const p = encodeURIComponent(JSON.stringify({ action: 'saveCustomers', customers: map }));
+    fetch(GAS_URL + '?data=' + p)
+      .then(r => r.json())
+      .then(d => console.log('saveCustomers:', d.ok, d.saved))
+      .catch(e => console.log('saveCustomers error:', e));
+    alert('โหลดข้อมูลลูกค้าสำเร็จ: ' + Object.keys(map).length + ' accounts\nบันทึกลง Google Sheet แล้ว');
     render();
   };
   reader.readAsArrayBuffer(file);
@@ -604,7 +610,24 @@ function init() {
       if (d1) d1.value = yStr;
     }, 100);
   }
+  // โหลด CustomerTypes จาก Google Sheet ทันทีที่เปิด Tool
+  loadCustomersFromSheet();
   showPage('upload');
+}
+
+async function loadCustomersFromSheet() {
+  try {
+    const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getCustomers' })));
+    const data = await resp.json();
+    if (data.ok && data.customers && Object.keys(data.customers).length > 0) {
+      state.customerTypes = data.customers;
+      console.log('โหลด CustomerTypes จาก Sheet:', Object.keys(data.customers).length, 'accounts');
+      // อัปเดต badge ใน nav
+      document.getElementById('bill-count').textContent = state.bills.length;
+    }
+  } catch(e) {
+    console.log('loadCustomers error:', e.message);
+  }
 }
 
 // ─── Page routing ─────────────────────────────────────────────
@@ -941,17 +964,24 @@ function calculateBills() {
     if (t === '' || t === 'เงินสด')         return true;
     if (t === 'Credit7D')                   return today === 1;
     if (t === 'Credit15D')                  return dateNum === 1 || dateNum === 16;
-    if (t === 'Credit30D')                  return dateNum >= 28;
-    if (t === 'เปิดบิลรวม')                 return dateNum >= 28;
+    if (t === 'Credit30D')                  return false; // เปิดบิลรวมสิ้นเดือนเท่านั้น
+    if (t === 'เปิดบิลรวม')                 return false; // บันทึกสะสม ไม่เปิดบิลทุกวัน
     if (t === 'ไม่ต้องปิดใบเสร็จ')          return true;
     return false;
   }
 
+  function isAccumulateType(type) {
+    const t = String(type || '').trim();
+    return t === 'เปิดบิลรวม' || t === 'Credit30D';
+  }
+
   function getDateRange() {
-    if (targetDates.length === 1) return targetDates[0].split('-').reverse().join('/').slice(0,5);
-    const first = targetDates[0].split('-').reverse().join('/').slice(0,5);
-    const last  = targetDates[targetDates.length-1].split('-').reverse().join('/').slice(0,5);
-    return `${first}–${last}`;
+    function fmtDate(d) {
+      var p = d.split('-');
+      return p[2]+'/'+p[1]+'/'+p[0]; // dd/MM/yyyy
+    }
+    if (targetDates.length === 1) return fmtDate(targetDates[0]);
+    return fmtDate(targetDates[0]) + '–' + fmtDate(targetDates[targetDates.length-1]);
   }
 
   // ใช้ customerTypes ที่โหลดจากหน้า 'ข้อมูลลูกค้า'
@@ -1028,9 +1058,33 @@ function calculateBills() {
   Object.values(mergedGroups).forEach(g => bills.push(g));
   bills.forEach((b,i) => b.id = i+1);
 
-  state.bills = bills;
-  state.selectedBills = new Set(bills.map(b => b.id));
-  document.getElementById('bill-count').textContent = bills.length;
+  // แยก เปิดบิลรวม ออก
+  const accumulateBills = bills.filter(b => isAccumulateType(b.type));
+  const normalBills     = bills.filter(b => !isAccumulateType(b.type));
+
+  // บันทึก เปิดบิลรวม ลง Sheet อัตโนมัติ
+  if (accumulateBills.length > 0) {
+    const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
+    const accPayload = accumulateBills.map(b => ({
+      subAcc:    b.subAcc,
+      flowName:  getFlowName(b.subAcc),
+      carrier:   b.carrier,
+      type:      b.type,
+      dateRange: b.dateRange,
+      billDate:  selDate,
+      freight:   parseFloat(b.freight)  || 0,
+      cod:       parseFloat(b.cod)      || 0,
+      total:     parseFloat(b.total)    || 0,
+      noReceipt: b.noReceipt || false,
+    }));
+    const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulate', bills: accPayload }));
+    fetch(GAS_URL + '?data=' + p).catch(e => console.log('saveAccumulate error:', e));
+    console.log('บันทึกเปิดบิลรวม', accumulateBills.length, 'รายการลง Sheet');
+  }
+
+  state.bills = normalBills;
+  state.selectedBills = new Set(normalBills.map(b => b.id));
+  document.getElementById('bill-count').textContent = normalBills.length;
   showPage('bills');
 }
 
@@ -1091,8 +1145,8 @@ function renderBills() {
       <td><span class="badge ${carrierBadge}" style="font-size:10px">${b.carrier}</span></td>
       <td><span class="badge ${typeBadge}" style="font-size:10px">${b.type}</span></td>
       <td class="muted" style="font-size:11px">${b.dateRange}</td>
-      <td class="right mono">${b.freight > 0 ? '฿'+b.freight.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
-      <td class="right mono">${b.cod > 0 ? '฿'+b.cod.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
+      <td class="right mono">${(parseFloat(b.freight)||0) > 0 ? '฿'+(parseFloat(b.freight)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
+      <td class="right mono">${(parseFloat(b.cod)||0) > 0 ? '฿'+(parseFloat(b.cod)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
       <td class="right mono" style="font-weight:500">฿${b.total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
       <td>${b.noReceipt ? '<span class="badge badge-gray" style="font-size:9px">ไม่ปิดใบเสร็จ</span>' : ''}</td>
     </tr>`;
@@ -1129,7 +1183,7 @@ function renderBills() {
         </colgroup>
         <thead>
           <tr>
-            <th><input type="checkbox" onchange="selectAll(this.checked)"></th>
+            <th><input type="checkbox" id="check-all" onchange="selectAll(this.checked)"></th>
             <th>ลูกค้า / Sub Account</th>
             <th>Carrier</th>
             <th>ประเภท</th>
@@ -1268,6 +1322,9 @@ function selectAll(checked) {
   if (checked) state.bills.forEach(b => state.selectedBills.add(b.id));
   else         state.selectedBills.clear();
   render();
+  // sync header checkbox
+  const hdr = document.getElementById('check-all');
+  if (hdr) hdr.checked = checked;
 }
 
 function filterByType(type) {
