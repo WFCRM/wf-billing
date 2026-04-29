@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhaleFast — เปิดบิลรายรับ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #f7f6f3;
+  --bg2: #ffffff;
+  --bg3: #f0efe9;
+  --border: #e4e2da;
+  --border2: #d0cec4;
+  --text: #1a1915;
+  --text2: #6b6960;
+  --text3: #a8a69e;
+  --blue: #1a56db;
+  --blue-bg: #eff4ff;
+  --blue-border: #c3d2f7;
+  --green: #057a55;
+  --green-bg: #f0fdf4;
+  --green-border: #a7f3d0;
+  --amber: #92400e;
+  --amber-bg: #fffbeb;
+  --amber-border: #fcd34d;
+  --red: #9b1c1c;
+  --red-bg: #fef2f2;
+  --red-border: #fca5a5;
+  --purple: #5521b5;
+  --purple-bg: #f5f3ff;
+  --purple-border: #c4b5fd;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.layout { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-mark {
+  display: flex; align-items: center; gap: 8px;
+}
+.logo-icon {
+  width: 28px; height: 28px; background: var(--text);
+  border-radius: 6px; display: flex; align-items: center;
+  justify-content: center;
+}
+.logo-icon svg { width: 16px; height: 16px; }
+.logo-name { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -.3px; }
+.logo-sub { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 3px; }
+
+.nav { padding: 10px 0; flex: 1; }
+.nav-section {
+  padding: 10px 18px 4px;
+  font-size: 10px; font-weight: 500;
+  color: var(--text3); letter-spacing: .8px; text-transform: uppercase;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 18px; font-size: 13px; color: var(--text2);
+  cursor: pointer; transition: all .12s;
+  border-left: 2px solid transparent;
+}
+.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item.active {
+  color: var(--blue); background: var(--blue-bg);
+  border-left-color: var(--blue); font-weight: 500;
+}
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .7; }
+.nav-item.active svg { opacity: 1; }
+
+.nav-badge {
+  margin-left: auto; padding: 1px 6px;
+  background: var(--blue); color: #fff;
+  border-radius: 10px; font-size: 10px; font-weight: 500;
+}
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.topbar-left { display: flex; flex-direction: column; gap: 1px; }
+.topbar-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.topbar-sub { font-size: 12px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.content { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; font-size: 12px; font-family: inherit;
+  border-radius: 7px; cursor: pointer; font-weight: 500;
+  border: 1px solid var(--border2);
+  background: var(--bg2); color: var(--text2);
+  transition: all .12s;
+}
+.btn:hover { background: var(--bg3); color: var(--text); }
+.btn:active { transform: scale(.98); }
+.btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn-primary:hover { filter: brightness(.9); }
+.btn-green { background: var(--green); border-color: var(--green); color: #fff; }
+.btn-green:hover { filter: brightness(.9); }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+
+/* Cards */
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.card-hd {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.card-body { padding: 14px 16px; }
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
+}
+.badge-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+.badge-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.badge-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+.badge-purple { background: var(--purple-bg); color: var(--purple); border: 1px solid var(--purple-border); }
+.badge-gray { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+
+/* Grid */
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* Metric */
+.metric { background: var(--bg3); border-radius: 8px; padding: 12px 14px; border: 1px solid var(--border); }
+.metric-label { font-size: 11px; color: var(--text3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+.metric-value { font-size: 22px; font-weight: 600; line-height: 1; }
+.metric-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
+
+/* Upload zone */
+.upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.upload-zone {
+  border: 1.5px dashed var(--border2); border-radius: 8px;
+  padding: 14px 10px; text-align: center; cursor: pointer;
+  transition: all .15s; position: relative; overflow: hidden;
+  background: var(--bg2);
+}
+.upload-zone:hover { border-color: var(--blue); background: var(--blue-bg); }
+.upload-zone.done { border-style: solid; border-color: var(--green-border); background: var(--green-bg); }
+.upload-zone.done:hover { border-color: var(--green); }
+.upload-zone.missing { border-color: var(--border); background: var(--bg3); opacity: .6; }
+.uz-icon { font-size: 20px; margin-bottom: 5px; }
+.uz-name { font-size: 11px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.uz-sub { font-size: 10px; color: var(--text3); }
+.uz-check { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+input[type=file] { display: none; }
+
+/* Alert */
+.alert {
+  border-radius: 8px; padding: 10px 14px;
+  display: flex; align-items: flex-start; gap: 10px; font-size: 12px;
+}
+.alert-amber { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber); }
+.alert-blue { background: var(--blue-bg); border: 1px solid var(--blue-border); color: var(--blue); }
+.alert-green { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
+.alert-icon { flex-shrink: 0; margin-top: 1px; }
+
+/* Table */
+.tbl-wrap { overflow-x: auto; }
+.tbl {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; table-layout: fixed;
+}
+.tbl th {
+  padding: 8px 10px; text-align: left;
+  font-size: 10px; color: var(--text3); font-weight: 500;
+  letter-spacing: .5px; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3); white-space: nowrap;
+}
+.tbl td {
+  padding: 9px 10px; border-bottom: 1px solid var(--border);
+  color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: var(--bg3); }
+.tbl .right { text-align: right; }
+.tbl .muted { color: var(--text3); font-size: 11px; }
+.tbl .mono { font-family: 'IBM Plex Mono', monospace; }
+.tbl input[type=checkbox] { accent-color: var(--blue); width: 13px; height: 13px; cursor: pointer; }
+
+/* Footer bar */
+.footer-bar {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  background: var(--bg3); display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Progress steps */
+.steps { display: flex; flex-direction: column; gap: 6px; }
+.step-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 7px; font-size: 12px;
+  background: var(--bg3); border: 1px solid var(--border);
+}
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 500; flex-shrink: 0;
+}
+.step-done { background: var(--green); color: #fff; }
+.step-active { background: var(--blue); color: #fff; }
+.step-todo { background: var(--bg2); border: 1px solid var(--border2); color: var(--text3); }
+
+/* Type tag */
+.type-tag {
+  display: inline-flex; padding: 1px 6px;
+  border-radius: 4px; font-size: 10px; font-weight: 500;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 16px; }
+.tab {
+  padding: 9px 14px; font-size: 12px; cursor: pointer;
+  color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 500; }
+
+/* Empty state */
+.empty { padding: 32px; text-align: center; color: var(--text3); font-size: 13px; }
+.empty svg { width: 36px; height: 36px; margin: 0 auto 10px; display: block; opacity: .3; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M2 12L6 4h3l5 8H2Z" fill="white" opacity=".9"/><path d="M6 8l2-4 2 4" fill="white"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">WhaleFast</div>
+        <div class="logo-sub">billing · รายรับ</div>
+      </div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nav-section">รายรับ</div>
+    <div class="nav-item" onclick="showPage('overview')">
+      <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="9" y="1" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="9" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/></svg>
+      ภาพรวม
+    </div>
+    <div class="nav-item active" onclick="showPage('upload')">
+      <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5v8M4 5l3.5-3.5L11 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 11v2a1 1 0 001 1h11a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      อัปโหลดไฟล์
+    </div>
+    <div class="nav-item" onclick="showPage('bills')">
+      <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="1.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.1"/><path d="M1 5h13" stroke="currentColor" stroke-width="1.1"/><path d="M4 8h4M4 11h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+      รายการเปิดบิลวันนี้
+      <span class="nav-badge" id="bill-count">0</span>
+    </div>
+    <div class="nav-item" onclick="showPage('tracking')">
+      <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.1"/><path d="M7.5 4.5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+      ติดตามค้างชำระ
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title" id="page-title">อัปโหลดไฟล์รายงาน</div>
+      <div class="topbar-sub" id="page-sub">เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ</div>
+    </div>
+    <div class="topbar-right">
+      <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace" id="today-label"></span>
+      <div id="date-selector" style="display:none;align-items:center;gap:6px">
+        <label style="font-size:11px;color:var(--text2)">วันรับงาน:</label>
+        <input type="date" id="bill-date" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
+        <div id="multi-date-wrap" style="display:none;align-items:center;gap:4px">
+          <span style="font-size:11px;color:var(--text2)">ถึง:</span>
+          <input type="date" id="bill-date-end" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
+        </div>
+        <label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="multi-date-check" onchange="toggleMultiDate(this.checked)" style="accent-color:var(--blue)">
+          หลายวัน
+        </label>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="calculateBills()" id="calc-btn" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2v8" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+        คำนวณรายการ
+      </button>
+    </div>
+  </div>
+
+  <div class="content" id="main-content">
+    <!-- Filled by JS -->
+  </div>
+</div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────
+const MONTHS_TH = ['ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
+const DAYS_TH   = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+
+const FILES_CONFIG = [
+  { key:'flash_wf',  label:'Flash WF',   sub:'CZ0108',     color:'badge-blue',   required:true  },
+  { key:'flash_gap', label:'Flash GAP',  sub:'CAZ3461',    color:'badge-blue',   required:true  },
+  { key:'dhl',       label:'DHL',        sub:'DHL accounts',color:'badge-gray',  required:true  },
+  { key:'wefast',    label:'WefastD',    sub:'WF accounts', color:'badge-purple',required:true  },
+  { key:'spx',       label:'SPX',        sub:'SPX accounts',color:'badge-amber', required:false },
+];
+
+// กลุ่มพิเศษ Kiss Kloset & Kety Smile
+const SPECIAL_GROUPS = {
+  'kiss_kloset': {
+    name: 'บริษัท คิสโคลเซ็ท จำกัด',
+    accounts: ['CZ0108-107','CZ0108-188','1648547605-1'],
+  },
+  'kety_smile': {
+    name: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด',
+    accounts: ['CZ0108-108','CZ0108-186','1648547605-2'],
+  },
+};
+
+// ประเภท: ข้ามบิล
+const SKIP_TYPES = ['Internal(ไม่เปิดบิล)','Internal'];
+
+// ─── GAS Web App URL ─────────────────────────────────────────
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzIECCH9jQhFHEFbUNsnlldr78dI2J6Gjvvw2fP0Te9XyrWoC6KlIZ3kUTZ8ONylhVMFA/exec';
+
+// ─── Account Mapping → ชื่อบนใบกำกับ Flowaccount ────────────
+const ACCOUNT_MAPPING = {
+  '80022597': { flowName: 'บริษัท ฮาบิบ โค ฟูลฟิลล์เม้นท์ จำกัด' },
+  '80027576': { flowName: 'บริษัท จริงจังฟุตบอล จำกัด' },
+  '80020320': { flowName: 'บริษัท เอ็น.ที.บี อินเตอร์เนชั่นแนล จำกัด' },
+  '80027005': { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
+  '80027287': { flowName: 'บริษัท ซอร์ทเอาท์ จำกัด' },
+  '5403028':  { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
+  '80021666': { flowName: 'บริษัท ทรานสปีด จำกัด' },
+  '80027773': { flowName: 'บริษัท ไลน์ฮอลล์ เอ็กซ์เพรส (ประเทศไทย) จำกัด' },
+  '80030479': { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
+  '80027092': { flowName: 'ร้าน ธีริทธิ์ Auto Part' },
+  'CZ0108-165': { flowName: 'นางสาวสุชาดา โคตรสุวรรณ' },
+  'CZ0108-142': { flowName: 'นายธนากร ธเนศกุลบุตร' },
+  'CZ0108-107': { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  'CZ0108-188': { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  'CZ0108-108': { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+  'CZ0108-186': { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+  'CZ0108-166': { flowName: 'บริษัท ธีระวรา มหาเฮง กรุ๊ป 888 จำกัด' },
+  'CZ0108-128': { flowName: 'บริษัท นูยู จำกัด' },
+  'CZ0108-130': { flowName: 'บริษัท พีพี สตูดิโอ17 จำกัด' },
+  'CZ0108-175': { flowName: 'บริษัท ยู เฟรท จำกัด' },
+  'CZ0108-160': { flowName: 'บริษัท รวยหมื่นปี 888 จำกัด' },
+  'CZ0108-162': { flowName: 'บริษัท อเด็คโก้ เพชรบุรีตัดใหม่ จำกัด' },
+  'CZ0108-93':  { flowName: 'บริษัท ออล กู๊ด โปรดักส์ จำกัด' },
+  'CZ0108-81':  { flowName: 'บริษัท เอสพี อะกรีกูดส์ จำกัด' },
+  'CZ0108-178': { flowName: 'ร้าน Neo casePage' },
+  'CZ0108-49':  { flowName: 'ศักดินันท์ สุดรัก' },
+  'CZ0108-90':  { flowName: 'บริษัท ฟีมิคส์ จำกัด' },
+  'CZ0108-154': { flowName: 'บริษัท แอดไวซ์มิชชั่น จำกัด' },
+  'CZ0108-33':  { flowName: 'ชมัยพร แก้วงอก' },
+  'CZ0108-13':  { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
+  'CZ0108-191': { flowName: 'บริษัท เจ็นเอ็นเอสอินเตอร์เทรด จำกัด' },
+  'CZ0108-61':  { flowName: 'บริษัท ดี.ลอยัล เอ็นเตอร์ไพรส์ จำกัด' },
+  'CZ0108-148': { flowName: 'บริษัท บิวตี้ไนน์ คอสเมติกส์ จำกัด' },
+  'CZ0108-158': { flowName: 'บริษัท เลิฟลี่ไนท์ จำกัด' },
+  'CZ0108-60':  { flowName: 'เฉลิมพล สาหรี่' },
+  'CZ0108-8':   { flowName: 'หจก.ถมทอง 955' },
+  'CZ0108-71':  { flowName: 'นายวุฒิพงษ์ ประจันโท' },
+  'CZ0108-53':  { flowName: 'นส.พรรคศม แซ่แต้' },
+  'CZ0108-74':  { flowName: 'คุณจิรกิตติ์ ศิริอำนาจ' },
+  'CZ0108-146': { flowName: 'นางสาวสุกัญญา หาญสงคราม' },
+  'CZ0108-54':  { flowName: 'นภัสสรณ์ คฤหพรพงศ์' },
+  'CZ0108-95':  { flowName: 'คุณกุลิสรา หงวน' },
+  'CZ0108-115': { flowName: 'คุณจันทิมา สร้อยเพชร' },
+  'CZ0108-44':  { flowName: 'บริษัท ริช ดีย์วา จำกัด' },
+  'WF1663': { flowName: 'บริษัท เหมียวช็อป คอสเมติก จำกัด' },
+  'WF1955': { flowName: 'บริษัท ริพเพิลส์คอมเมิร์ซ จำกัด' },
+  'WF238':  { flowName: 'บริษัท จันทรานนท์14 จำกัด' },
+  '1648547605-1': { flowName: 'บริษัท คิสโคลเซ็ท จำกัด' },
+  '1648547605-2': { flowName: 'บริษัท เคธี่ สไมล์ อินฟินิตี้ จำกัด' },
+};
+
+function getFlowName(subAcc) {
+  // normalize CZ-xxx → CZ0108-xxx
+  let acc = String(subAcc).trim();
+  if (/^CZ-\d+/.test(acc)) acc = 'CZ0108-' + acc.replace('CZ-','');
+  return ACCOUNT_MAPPING[acc]?.flowName || acc;
+}
+
+let state = {
+  files: {},        // key → { name, data, sheets }
+  customerMap: {},  // subAccount → { name, type, carrier }
+  bills: [],        // คำนวณแล้ว
+  selectedBills: new Set(),
+  trackingCarrier: 'Flash',
+  currentPage: 'upload',
+  calculating: false,
+};
+
+// ─── Init ─────────────────────────────────────────────────────
+function init() {
+  const now = new Date();
+  const dateStr = `${now.getDate()} ${MONTHS_TH[now.getMonth()]} ${now.getFullYear()} (วัน${DAYS_TH[now.getDay()]})`;
+  document.getElementById('today-label').textContent = dateStr;
+  // default วันที่ = เมื่อวาน
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0,10);
+  // ถ้าวันจันทร์ default start = ศุกร์ที่แล้ว
+  if (now.getDay() === 1) {
+    const fri = new Date(now); fri.setDate(now.getDate() - 3);
+    const sun = new Date(now); sun.setDate(now.getDate() - 1);
+    setTimeout(() => {
+      const d1 = document.getElementById('bill-date');
+      const d2 = document.getElementById('bill-date-end');
+      const mc = document.getElementById('multi-date-check');
+      if (d1) d1.value = fri.toISOString().slice(0,10);
+      if (d2) d2.value = sun.toISOString().slice(0,10);
+      if (mc) { mc.checked = true; toggleMultiDate(true); }
+    }, 100);
+  } else {
+    setTimeout(() => {
+      const d1 = document.getElementById('bill-date');
+      if (d1) d1.value = yStr;
+    }, 100);
+  }
+  showPage('upload');
+}
+
+// ─── Page routing ─────────────────────────────────────────────
+function showPage(page) {
+  state.currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  event?.currentTarget?.classList.add('active');
+  const titles = {
+    overview: ['ภาพรวม','สถานะการเปิดบิลประจำวัน'],
+    upload:   ['อัปโหลดไฟล์รายงาน','เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ'],
+    bills:    ['รายการเปิดบิลวันนี้','คำนวณจากไฟล์ที่อัปโหลด แยกตามประเภทลูกค้า'],
+    tracking: ['ติดตามค้างชำระ','สถานะการชำระเงินของลูกค้าทั้งหมด'],
+  };
+  const [title, sub] = titles[page] || ['',''];
+  document.getElementById('page-title').textContent = title;
+  document.getElementById('page-sub').textContent   = sub;
+  render();
+}
+
+// ─── Render ───────────────────────────────────────────────────
+function render() {
+  const c = document.getElementById('main-content');
+  if      (state.currentPage === 'upload')   c.innerHTML = renderUpload();
+  else if (state.currentPage === 'bills')    c.innerHTML = renderBills();
+  else if (state.currentPage === 'tracking') { renderTracking(); return; }
+  else                                        c.innerHTML = renderOverview();
+
+  // Show/hide calc btn and date selector
+  const hasFiles = Object.keys(state.files).length >= 1;
+  const calcBtn  = document.getElementById('calc-btn');
+  const dateSel  = document.getElementById('date-selector');
+  const showCtrl = hasFiles && state.currentPage === 'upload';
+  if (calcBtn) calcBtn.style.display = showCtrl ? '' : 'none';
+  if (dateSel) dateSel.style.display = showCtrl ? 'flex' : 'none';
+
+  // badge count
+  document.getElementById('bill-count').textContent = state.bills.length;
+}
+
+// ─── Upload page ──────────────────────────────────────────────
+function renderUpload() {
+  const uploadCards = FILES_CONFIG.map(f => {
+    const loaded = state.files[f.key];
+    const cls = loaded ? 'done' : (!f.required ? 'missing' : '');
+    return `
+    <label class="upload-zone ${cls}" for="file-${f.key}" onclick="">
+      <input type="file" id="file-${f.key}" accept=".xlsx,.xls" onchange="handleFile(event,'${f.key}')">
+      <div class="uz-icon">${loaded ? '📗' : '📂'}</div>
+      <div class="uz-name">${f.label}</div>
+      <div class="uz-sub">${loaded ? loaded.name : (f.required ? 'คลิกเพื่ออัปโหลด' : 'ไม่มีทุกวัน')}</div>
+      ${loaded ? `<div class="uz-check"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2 2L7.5 2" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ''}
+    </label>`;
+  }).join('');
+
+  const steps = [
+    { label:'อัปโหลดไฟล์รายงาน', done: Object.keys(state.files).length > 0 },
+    { label:'ระบบอ่านและจัดกลุ่มข้อมูล', done: state.bills.length > 0 },
+    { label:'คำนวณรายการที่ต้องเปิดบิลวันนี้', done: state.bills.length > 0 },
+    { label:'พนักงานเช็คและ confirm', done: false },
+    { label:'เปิดบิลใน Flowaccount', done: false },
+  ];
+
+  const stepHtml = steps.map((s, i) => {
+    const isDone   = s.done;
+    const isActive = !s.done && (i === 0 || steps[i-1].done);
+    const cls      = isDone ? 'step-done' : (isActive ? 'step-active' : 'step-todo');
+    const icon     = isDone
+      ? `<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="white" stroke-width="1.4" stroke-linecap="round"/></svg>`
+      : (i+1);
+    return `<div class="step-item">
+      <div class="step-num ${cls}">${icon}</div>
+      <span style="color:${isDone?'var(--green)':isActive?'var(--blue)':'var(--text3)'}">${s.label}</span>
+      ${isActive ? '<span class="badge badge-blue" style="margin-left:auto;font-size:10px">ดำเนินการ</span>' : ''}
+    </div>`;
+  }).join('');
+
+  const readyCount = Object.keys(state.files).length;
+  const alertHtml  = state.bills.length > 0
+    ? `<div class="alert alert-green"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#057a55"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>คำนวณเสร็จแล้ว — พบ <strong>${state.bills.length} รายการ</strong> ที่ต้องเปิดบิลวันนี้ <button class="btn btn-sm btn-green" style="margin-left:auto" onclick="showPage('bills')">ดูรายการ →</button></div>`
+    : readyCount >= 1
+    ? `<div class="alert alert-blue"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#1a56db"/><path d="M7 4.5v4M7 9.5v.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>อัปโหลดไฟล์แล้ว ${readyCount} ไฟล์ — กดปุ่ม "คำนวณรายการ" ด้านบนขวาได้เลยครับ</div>`
+    : `<div class="alert alert-amber"><svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#EF9F27"/><path d="M7 4v4M7 9.5v.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>กรุณาอัปโหลดไฟล์อย่างน้อย 1 ไฟล์ก่อน</div>`;
+
+  return `
+  ${alertHtml}
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-title">ไฟล์รายงานประจำวัน</div>
+        <span class="badge badge-${readyCount >= 3 ? 'green' : 'amber'}">${readyCount}/5 ไฟล์</span>
+      </div>
+      <div class="card-body">
+        <div class="upload-grid">${uploadCards}</div>
+        <div style="font-size:11px;color:var(--text3)">* Flash WF, Flash GAP, DHL, WefastD จำเป็น — SPX บางวันอาจไม่มี</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-title">ขั้นตอนการทำงาน</div></div>
+      <div class="card-body"><div class="steps">${stepHtml}</div></div>
+    </div>
+  </div>`;
+}
+
+// ─── Handle file upload ────────────────────────────────────────
+function handleFile(evt, key) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb    = XLSX.read(e.target.result, { type:'array' });
+    const sheets = {};
+    wb.SheetNames.forEach(n => { sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header:1, defval:'' }); });
+    state.files[key] = { name: file.name, sheets };
+    render();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── Toggle multi-date ──────────────────────────────────────
+function toggleMultiDate(checked) {
+  const wrap = document.getElementById('multi-date-wrap');
+  if (wrap) wrap.style.display = checked ? 'flex' : 'none';
+}
+
+// ─── Get selected date range ─────────────────────────────────
+function getSelectedDates() {
+  const d1 = document.getElementById('bill-date')?.value;
+  const d2 = document.getElementById('bill-date-end')?.value;
+  const multi = document.getElementById('multi-date-check')?.checked;
+  if (!d1) return null;
+  if (multi && d2) {
+    // สร้าง array ของวันที่ระหว่าง d1 ถึง d2
+    const dates = [];
+    const cur = new Date(d1);
+    const end = new Date(d2);
+    while (cur <= end) {
+      dates.push(cur.toISOString().slice(0,10));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+  return [d1];
+}
+
+// ─── Parse Flash from Daily report ──────────────────────────
+function parseFlashDaily(sheets, carrier, targetDates) {
+  const sname = Object.keys(sheets).find(n => n.includes('Daily report') || n.includes('daily'));
+  if (!sname) return parseFlashPivot(sheets, carrier); // fallback
+  const rows = sheets[sname];
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0];
+  const dateCol    = headers.findIndex(h => String(h).trim() === 'Date');
+  const accCol     = headers.findIndex(h => String(h).includes('Operated by') || String(h) === 'Operated by');
+  const nameCol    = headers.findIndex(h => String(h).includes('Sub-account Name'));
+  const freightCol = headers.findIndex(h => String(h).trim() === 'Freight ');
+  const codCol     = headers.findIndex(h => String(h).trim() === 'COD ');
+  const happyCol   = headers.findIndex(h => String(h).includes('Happy Return'));
+  const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
+  const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat'));
+  const touristCol = headers.findIndex(h => String(h).includes('พื้นที่ท่องเที่ยว'));
+  const pkgCol     = headers.findIndex(h => String(h).includes('Packaging'));
+
+  if (dateCol < 0 || accCol < 0) return parseFlashPivot(sheets, carrier);
+
+  // filter rows ตามวันที่
+  const grouped = {};
+  for (let i = 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const rowDate = String(row[dateCol] || '').trim();
+    if (!targetDates.some(d => rowDate === d || rowDate.includes(d.replace(/-/g,'/')))) continue;
+    const acc  = String(row[accCol]  || '').trim();
+    const name = String(row[nameCol] || acc).trim();
+    if (!acc || acc === 'nan') continue;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    grouped[acc].freight += parseFloat(row[freightCol]) || 0;
+    grouped[acc].cod     += parseFloat(row[codCol])     || 0;
+    grouped[acc].happy   += parseFloat(row[happyCol])   || 0;
+    grouped[acc].remote  += parseFloat(row[remoteCol])  || 0;
+    grouped[acc].tourist += parseFloat(row[touristCol]) || 0;
+    grouped[acc].pkg     += parseFloat(row[pkgCol])     || 0;
+    grouped[acc].total   += parseFloat(row[totalVatCol])|| 0;
+  }
+  return Object.values(grouped).filter(b => b.total > 0);
+}
+
+// fallback: pivot (ไม่ filter date)
+function parseFlashPivot(sheets, carrier) {
+  const sname = Object.keys(sheets).find(n => n.includes('สรุปยอด'));
+  if (!sname) return [];
+  const rows = sheets[sname];
+  let hrow = -1;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    if (rows[i].some(v => String(v).includes('Row Labels'))) { hrow = i; break; }
+  }
+  if (hrow < 0) return [];
+  const headers = rows[hrow];
+  const totalCol   = headers.findIndex(h => String(h).includes('Total รวม Vat'));
+  const freightCol = headers.findIndex(h => String(h).includes('Freight'));
+  const codCol     = headers.findIndex(h => String(h).trim() === 'Sum of COD' || String(h).includes('Sum of COD '));
+  if (totalCol < 0) return [];
+  const result = [];
+  for (let i = hrow + 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const name = String(row[0] || '').trim();
+    if (!name || name.toLowerCase().includes('grand total')) continue;
+    const total   = parseFloat(row[totalCol])   || 0;
+    const freight = parseFloat(row[freightCol]) || 0;
+    const cod     = parseFloat(row[codCol])     || 0;
+    if (total <= 0) continue;
+    result.push({ acc: name, name, carrier, freight, cod, happy:0, remote:0, tourist:0, pkg:0, total });
+  }
+  return result;
+}
+
+// ─── Parse DHL from detail sheet ────────────────────────────
+function parseDHLDaily(sheets, targetDates) {
+  const sname = Object.keys(sheets).find(n => n.includes('ข้อมูลรายละเอียด') || n.includes('detail'));
+  if (!sname) return [];
+  const rows = sheets[sname];
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0];
+  const dateCol    = headers.findIndex(h => String(h).includes('Pick up date'));
+  const accCol     = headers.findIndex(h => String(h).includes('Pick Up Account') && !String(h).includes('Name'));
+  const nameCol    = headers.findIndex(h => String(h).includes('Pick Up Account Name') || String(h).includes('Customer Name'));
+  const freightCol = headers.findIndex(h => String(h).trim() === 'Freight');
+  const codCol     = headers.findIndex(h => String(h).trim() === 'COD');
+  const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
+  const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat'));
+  if (dateCol < 0 || accCol < 0) return [];
+
+  const grouped = {};
+  for (let i = 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const rowDate = String(row[dateCol] || '').trim().replace(/\./g,'-');
+    // DHL format: 27.04.2026 → compare with 2026-04-27
+    const rowDateNorm = rowDate.split('-').reverse().join('-');
+    if (!targetDates.some(d => rowDateNorm === d || rowDate.includes(d.split('-').reverse().join('.')))) continue;
+    const acc  = String(row[accCol]  || '').trim();
+    const name = String(row[nameCol] || acc).trim();
+    if (!acc || acc === 'nan') continue;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'DHL', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    grouped[acc].freight += parseFloat(row[freightCol]) || 0;
+    grouped[acc].cod     += parseFloat(row[codCol])     || 0;
+    grouped[acc].remote  += parseFloat(row[remoteCol])  || 0;
+    grouped[acc].total   += parseFloat(row[totalVatCol])|| 0;
+  }
+  return Object.values(grouped).filter(b => b.total > 0);
+}
+
+// ─── Parse WefastD ───────────────────────────────────────────
+function parseWefastDaily(sheets, targetDates) {
+  const WF_ACCOUNTS = { 'WF238': 'Credit7D', 'WF1663': 'เงินสด', 'WF1995': 'Credit15D' };
+  const sname = Object.keys(sheets).find(n => n.includes('ข้อมูลรายละเอียด'));
+  if (!sname) return [];
+  const rows = sheets[sname];
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0];
+  const dateCol  = headers.findIndex(h => String(h).trim() === 'Date');
+  const accCol   = headers.findIndex(h => String(h).trim() === 'Account');
+  const nameCol  = headers.findIndex(h => String(h).trim() === 'Customer name');
+  const priceCol = headers.findIndex(h => String(h).includes('ราคา (บาท)'));
+  const totalCol = headers.findIndex(h => String(h).trim() === 'Grand Total');
+  const codCol   = headers.findIndex(h => String(h).trim().startsWith('เก็บเงิน') || String(h).includes('COD'));
+  if (accCol < 0) return [];
+  const grouped = {};
+  for (let i = 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const rowDate = String(row[dateCol] || '').trim().slice(0,10);
+    if (!targetDates.some(d => rowDate === d || rowDate.includes(d))) continue;
+    const acc  = String(row[accCol] || '').trim();
+    if (!WF_ACCOUNTS[acc]) continue;
+    const name = String(row[nameCol] || acc).trim();
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'WefastD', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0, overrideType: WF_ACCOUNTS[acc] };
+    grouped[acc].freight += parseFloat(row[priceCol]) || 0;
+    grouped[acc].total   += parseFloat(row[totalCol]) || 0;
+    grouped[acc].cod     += parseFloat(row[codCol])   || 0;
+  }
+  return Object.values(grouped).filter(b => b.total > 0);
+}
+
+// ─── Parse SPX ───────────────────────────────────────────────
+function parseSPXDaily(sheets, targetDates) {
+  const sname = Object.keys(sheets).find(n => n.includes('ข้อมูลรายละเอียด') && !n.includes('SPX'));
+  if (!sname) return [];
+  const rows = sheets[sname];
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0];
+  const dateCol    = headers.findIndex(h => String(h).trim() === 'Date');
+  const accCol     = headers.findIndex(h => String(h).trim() === 'Account');
+  const nameCol    = headers.findIndex(h => String(h).includes('Sub-account Name'));
+  const freightCol = headers.findIndex(h => String(h).trim() === 'Freight');
+  const codCol     = headers.findIndex(h => String(h).trim() === 'COD');
+  const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
+  const totalCol   = headers.findIndex(h => String(h).includes('Total+Vat') || String(h).includes('Total รวม Vat'));
+  if (accCol < 0) return [];
+  const grouped = {};
+  for (let i = 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const rowDate = String(row[dateCol] || '').trim().slice(0,10);
+    if (!targetDates.some(d => rowDate === d)) continue;
+    const acc  = String(row[accCol] || '').trim();
+    const name = String(row[nameCol] || acc).trim();
+    if (!acc || acc === 'nan') continue;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'SPX', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    grouped[acc].freight += parseFloat(row[freightCol]) || 0;
+    grouped[acc].cod     += parseFloat(row[codCol])     || 0;
+    grouped[acc].remote  += parseFloat(row[remoteCol])  || 0;
+    grouped[acc].total   += parseFloat(row[totalCol])   || 0;
+  }
+  return Object.values(grouped).filter(b => b.total > 0);
+}
+
+// ─── Calculate bills ──────────────────────────────────────────
+function calculateBills() {
+  const targetDates = getSelectedDates();
+  if (!targetDates) { alert('กรุณาเลือกวันที่ก่อนครับ'); return; }
+
+  const now     = new Date(targetDates[0]);
+  const today   = now.getDay();
+  const dateNum = now.getDate();
+
+  function shouldBillToday(type) {
+    if (!type || SKIP_TYPES.some(s => String(type).includes(s))) return false;
+    const t = String(type).trim();
+    if (t === '' || t === 'เงินสด')         return true;
+    if (t === 'Credit7D')                   return today === 1;
+    if (t === 'Credit15D')                  return dateNum === 1 || dateNum === 16;
+    if (t === 'Credit30D')                  return dateNum >= 28;
+    if (t === 'เปิดบิลรวม')                 return dateNum >= 28;
+    if (t === 'ไม่ต้องปิดใบเสร็จ')          return true;
+    return false;
+  }
+
+  function getDateRange() {
+    if (targetDates.length === 1) return targetDates[0].split('-').reverse().join('/').slice(0,5);
+    const first = targetDates[0].split('-').reverse().join('/').slice(0,5);
+    const last  = targetDates[targetDates.length-1].split('-').reverse().join('/').slice(0,5);
+    return `${first}–${last}`;
+  }
+
+  // อ่าน customer type map
+  const custTypeMap = {};
+  Object.values(state.files).forEach(f => {
+    const dsname = Object.keys(f.sheets).find(n => n.includes('data ลค') || n.startsWith('data'));
+    if (!dsname) return;
+    const rows = f.sheets[dsname];
+    for (let i = 1; i < rows.length; i++) {
+      const row  = rows[i];
+      const acc  = String(row[9] || '').trim();
+      const type = String(row[11] || '').trim();
+      if (acc && type) custTypeMap[acc] = type;
+    }
+  });
+
+  // parse ทุกไฟล์
+  let rawBills = [];
+  if (state.files.flash_wf)  rawBills = rawBills.concat(parseFlashDaily(state.files.flash_wf.sheets,  'Flash WF',  targetDates));
+  if (state.files.flash_gap) rawBills = rawBills.concat(parseFlashDaily(state.files.flash_gap.sheets, 'Flash GAP', targetDates));
+  if (state.files.dhl)       rawBills = rawBills.concat(parseDHLDaily(state.files.dhl.sheets,   targetDates));
+  if (state.files.wefast)    rawBills = rawBills.concat(parseWefastDaily(state.files.wefast.sheets, targetDates));
+  if (state.files.spx)       rawBills = rawBills.concat(parseSPXDaily(state.files.spx.sheets,   targetDates));
+
+  // กำหนด type + กรอง internal
+  const bills = [];
+  const mergedGroups = {};
+
+  for (const b of rawBills) {
+    const custType = b.overrideType || custTypeMap[b.acc] || custTypeMap[b.name] || '';
+    if (SKIP_TYPES.some(s => custType.includes(s))) continue;
+    if (!shouldBillToday(custType || 'เงินสด')) continue;
+
+    // special group
+    let groupKey = null, groupName = '';
+    for (const [gk, gv] of Object.entries(SPECIAL_GROUPS)) {
+      if (gv.accounts.some(a => b.acc.includes(a) || b.name.includes(a.replace(/CZ0108-/,'')))) {
+        groupKey = gk; groupName = gv.name; break;
+      }
+    }
+
+    const bill = {
+      id:        0,
+      subAcc:    b.acc,
+      name:      groupName || b.name,
+      flowName:  getFlowName(b.acc),
+      carrier:   b.carrier,
+      type:      custType || 'เงินสด',
+      freight:   b.freight,
+      cod:       b.cod,
+      happy:     b.happy || 0,
+      remote:    b.remote || 0,
+      tourist:   b.tourist || 0,
+      pkg:       b.pkg || 0,
+      total:     b.total,
+      dateRange: getDateRange(),
+      noReceipt: custType === 'ไม่ต้องปิดใบเสร็จ',
+      isGroup:   !!groupName,
+      groupKey,
+      lineItems: buildLineItems(b),
+    };
+
+    if (groupKey) {
+      if (!mergedGroups[groupKey]) { mergedGroups[groupKey] = { ...bill }; }
+      else {
+        mergedGroups[groupKey].freight += b.freight;
+        mergedGroups[groupKey].cod     += b.cod;
+        mergedGroups[groupKey].happy   += b.happy || 0;
+        mergedGroups[groupKey].remote  += b.remote || 0;
+        mergedGroups[groupKey].total   += b.total;
+        mergedGroups[groupKey].subAcc  += ', ' + b.acc;
+        if (!mergedGroups[groupKey].carrier.includes(b.carrier))
+          mergedGroups[groupKey].carrier += '+' + b.carrier;
+        mergedGroups[groupKey].lineItems = buildLineItemsFromBill(mergedGroups[groupKey]);
+      }
+    } else {
+      bills.push(bill);
+    }
+  }
+
+  Object.values(mergedGroups).forEach(g => bills.push(g));
+  bills.forEach((b,i) => b.id = i+1);
+
+  state.bills = bills;
+  state.selectedBills = new Set(bills.map(b => b.id));
+  document.getElementById('bill-count').textContent = bills.length;
+  showPage('bills');
+}
+
+function buildLineItems(b) {
+  const items = [];
+  if (b.freight  > 0) items.push({ label:'ค่าขนส่ง (Freight)',      amount: b.freight  });
+  if (b.cod      > 0) items.push({ label:'COD',                      amount: b.cod      });
+  if (b.happy    > 0) items.push({ label:'Happy Return',             amount: b.happy    });
+  if (b.remote   > 0) items.push({ label:'พื้นที่ห่างไกล',           amount: b.remote   });
+  if (b.tourist  > 0) items.push({ label:'พื้นที่ท่องเที่ยว',         amount: b.tourist  });
+  if (b.pkg      > 0) items.push({ label:'Packaging Fee',            amount: b.pkg      });
+  return items;
+}
+function buildLineItemsFromBill(b) {
+  return buildLineItems({ freight:b.freight, cod:b.cod, happy:b.happy, remote:b.remote, tourist:b.tourist, pkg:b.pkg });
+}
+
+// ─── Bills page ───────────────────────────────────────────────
+function renderBills() {
+  if (state.bills.length === 0) {
+    return `<div class="card"><div class="empty">
+      <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="4" width="28" height="28" rx="4" stroke="currentColor" stroke-width="1.5"/><path d="M12 18h12M18 12v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      ยังไม่มีรายการ — กรุณาอัปโหลดไฟล์และกดคำนวณก่อนครับ
+      <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload')">ไปอัปโหลดไฟล์</button>
+    </div></div>`;
+  }
+
+  const now   = new Date();
+  const day   = DAYS_TH[now.getDay()];
+  const types = [...new Set(state.bills.map(b => b.type))];
+  const total = state.bills.filter(b => state.selectedBills.has(b.id)).reduce((s,b) => s+b.total, 0);
+
+  const typeFilter = types.map(t =>
+    `<option value="${t}">${t}</option>`
+  ).join('');
+
+  const rows = state.bills.map(b => {
+    const checked = state.selectedBills.has(b.id);
+    const typeBadge =
+      b.type === 'Credit7D'  ? 'badge-blue' :
+      b.type === 'Credit15D' ? 'badge-purple' :
+      b.type === 'Credit30D' ? 'badge-red' :
+      b.type === 'เปิดบิลรวม' ? 'badge-amber' :
+      b.type === 'ไม่ต้องปิดใบเสร็จ' ? 'badge-gray' : 'badge-green';
+
+    const carrierBadge =
+      b.carrier.includes('Flash') ? 'badge-blue' :
+      b.carrier.includes('DHL')   ? 'badge-gray' :
+      b.carrier.includes('Wefast')? 'badge-purple' :
+      b.carrier.includes('SPX')   ? 'badge-amber' : 'badge-gray';
+
+    return `<tr>
+      <td><input type="checkbox" ${checked?'checked':''} onchange="toggleBill(${b.id},this.checked)"></td>
+      <td>
+        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</div>
+        <div class="muted">${b.subAcc}${b.isGroup ? ' <span style="color:var(--purple);font-size:9px">● กลุ่ม</span>' : ''}</div>
+      </td>
+      <td><span class="badge ${carrierBadge}" style="font-size:10px">${b.carrier}</span></td>
+      <td><span class="badge ${typeBadge}" style="font-size:10px">${b.type}</span></td>
+      <td class="muted" style="font-size:11px">${b.dateRange}</td>
+      <td class="right mono">${b.freight > 0 ? '฿'+b.freight.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
+      <td class="right mono">${b.cod > 0 ? '฿'+b.cod.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
+      <td class="right mono" style="font-weight:500">฿${b.total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${b.noReceipt ? '<span class="badge badge-gray" style="font-size:9px">ไม่ปิดใบเสร็จ</span>' : ''}</td>
+    </tr>`;
+  }).join('');
+
+  const selCount = state.selectedBills.size;
+
+  return `
+  <div class="grid-4">
+    <div class="metric"><div class="metric-label">รายการทั้งหมด</div><div class="metric-value" style="color:var(--blue)">${state.bills.length}</div><div class="metric-sub">วัน${day}นี้</div></div>
+    <div class="metric"><div class="metric-label">เลือกแล้ว</div><div class="metric-value" style="color:var(--green)">${selCount}</div><div class="metric-sub">รายการ</div></div>
+    <div class="metric"><div class="metric-label">ยอดรวมที่เลือก</div><div class="metric-value" style="color:var(--text);font-size:16px">฿${total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="metric-sub">รวม VAT</div></div>
+    <div class="metric"><div class="metric-label">กลุ่มพิเศษ</div><div class="metric-value" style="color:var(--purple)">${state.bills.filter(b=>b.isGroup).length}</div><div class="metric-sub">Kiss/Kety</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">รายการที่ต้องเปิดบิลวันนี้</div>
+      <div style="display:flex;gap:6px">
+        <select style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2)" onchange="filterByType(this.value)">
+          <option value="">ทุกประเภท</option>
+          ${typeFilter}
+        </select>
+        <button class="btn btn-sm" onclick="selectAll(true)">เลือกทั้งหมด</button>
+        <button class="btn btn-sm" onclick="selectAll(false)">ยกเลิก</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <colgroup>
+          <col style="width:32px"><col style="width:180px"><col style="width:80px">
+          <col style="width:90px"><col style="width:100px">
+          <col style="width:90px"><col style="width:80px"><col style="width:95px"><col style="width:80px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th><input type="checkbox" onchange="selectAll(this.checked)"></th>
+            <th>ลูกค้า / Sub Account</th>
+            <th>Carrier</th>
+            <th>ประเภท</th>
+            <th>รอบวันที่</th>
+            <th class="right">Freight</th>
+            <th class="right">COD</th>
+            <th class="right">รวม VAT</th>
+            <th>หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="footer-bar">
+      <div style="font-size:12px;color:var(--text2)">
+        เลือก <strong>${selCount}</strong> รายการ · รวม <strong>฿${total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="exportExcel()">Export Excel ↓</button>
+        <button class="btn btn-sm btn-green" onclick="confirmBills()">เปิดบิล Flowaccount (${selCount}) →</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── Tracking page ────────────────────────────────────────────
+async function renderTracking() {
+  const c = document.getElementById('main-content');
+  c.innerHTML = `<div class="card"><div class="empty">
+    <div class="spinner" style="margin:0 auto 10px"></div>กำลังโหลดข้อมูลค้างชำระ...
+  </div></div>`;
+
+  try {
+    const carrier = state.trackingCarrier || 'Flash';
+    const resp = await fetch(GAS_URL + '?action=getTracking&carrier=' + encodeURIComponent(carrier));
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+
+    const rows = data.rows || [];
+    const pending = rows.filter(r => r['สถานะ'] === 'รอชำระ');
+    const paid    = rows.filter(r => r['สถานะ'] === 'ชำระแล้ว');
+
+    const tabs = ['Flash','DHL','WefastD','SPX'].map(n =>
+      `<div class="tab ${n===carrier?'active':''}" onclick="state.trackingCarrier='${n}';renderTracking()">${n}</div>`
+    ).join('');
+
+    const rowsHtml = rows.length === 0
+      ? `<div class="empty">ยังไม่มีข้อมูล — เปิดบิลก่อนแล้วจะแสดงที่นี่</div>`
+      : rows.map(r => {
+          const isPending = r['สถานะ'] === 'รอชำระ';
+          const isOverdue = isPending && r['วันครบกำหนด'] && isOverdueDate(r['วันครบกำหนด']);
+          return `<tr>
+            <td><div style="font-weight:500;font-size:12px">${r['ชื่อลูกค้า (Flowaccount)']}</div>
+                <div style="font-size:10px;color:var(--text3)">${r['Sub Account']}</div></td>
+            <td><span class="badge badge-${r['Carrier']==='Flash'?'blue':r['Carrier']==='DHL'?'gray':r['Carrier']==='WefastD'?'purple':'amber'}" style="font-size:10px">${r['Carrier']}</span></td>
+            <td style="font-size:11px;color:var(--text2)">${r['รอบวันที่']}</td>
+            <td style="text-align:right;font-weight:500">฿${parseFloat(r['ยอดรวม VAT']||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+            <td style="font-size:11px;font-family:var(--font-mono)">${r['INV No. (Flowaccount)']||'-'}</td>
+            <td style="font-size:11px;color:${isOverdue?'var(--red)':'var(--text2)'}">${r['วันครบกำหนด']||'-'}</td>
+            <td>${r['วันที่ชำระ']||'-'}</td>
+            <td><span class="badge ${isPending?(isOverdue?'badge-red':'badge-amber'):'badge-green'}" style="font-size:10px">
+              ${isPending?(isOverdue?'เกินกำหนด':'รอชำระ'):'ชำระแล้ว'}</span></td>
+            <td>${isPending?`<button class="btn btn-sm" style="font-size:10px" onclick="markPaid('${r['INV No. (Flowaccount)']}','${carrier}')">บันทึกชำระ</button>`:''}</td>
+          </tr>`;
+        }).join('');
+
+    c.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div class="metric"><div class="metric-label">ทั้งหมด</div><div class="metric-value" style="color:var(--blue)">${rows.length}</div><div class="metric-sub">รายการ</div></div>
+      <div class="metric"><div class="metric-label">รอชำระ</div><div class="metric-value" style="color:var(--amber)">${pending.length}</div><div class="metric-sub">รายการ</div></div>
+      <div class="metric"><div class="metric-label">ชำระแล้ว</div><div class="metric-value" style="color:var(--green)">${paid.length}</div><div class="metric-sub">รายการ</div></div>
+    </div>
+    <div class="card">
+      <div style="border-bottom:1px solid var(--border);display:flex;padding:0 16px">${tabs}</div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <colgroup><col style="width:180px"><col style="width:70px"><col style="width:100px"><col style="width:90px"><col style="width:120px"><col style="width:90px"><col style="width:90px"><col style="width:80px"><col style="width:90px"></colgroup>
+          <thead><tr>
+            <th>ลูกค้า</th><th>Carrier</th><th>รอบวันที่</th>
+            <th class="right">ยอด VAT</th><th>INV No.</th>
+            <th>ครบกำหนด</th><th>วันชำระ</th><th>สถานะ</th><th></th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
+  } catch(err) {
+    document.getElementById('main-content').innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">โหลดข้อมูลไม่สำเร็จ: ${err.message}</div></div>`;
+  }
+}
+
+function isOverdueDate(dateStr) {
+  if (!dateStr) return false;
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return false;
+  const d = new Date(parts[2], parts[1]-1, parts[0]);
+  return d < new Date();
+}
+
+async function markPaid(invNo, carrier) {
+  if (!invNo || invNo === '-') { alert('ไม่มี INV No.'); return; }
+  const paidDate   = prompt('วันที่ชำระ (dd/mm/yyyy):', new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}));
+  if (!paidDate) return;
+  const paidAmount = prompt('ยอดที่ชำระ:');
+  if (!paidAmount) return;
+  const wht = prompt('หัก ณ ที่จ่าย (ถ้ามี ใส่ 0 ถ้าไม่มี):', '0');
+
+  try {
+    const resp = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'updatePayment', invNo, carrier, paidDate, paidAmount: parseFloat(paidAmount), wht: parseFloat(wht||0) }),
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    alert('บันทึกการชำระสำเร็จ!');
+    renderTracking();
+  } catch(err) {
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  }
+}
+
+// ─── Overview page ────────────────────────────────────────────
+function renderOverview() {
+  return `<div class="card"><div class="empty">
+    กด "อัปโหลดไฟล์" เพื่อเริ่มต้นใช้งานครับ
+    <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload')">เริ่มต้น →</button>
+  </div></div>`;
+}
+
+// ─── Actions ──────────────────────────────────────────────────
+function toggleBill(id, checked) {
+  if (checked) state.selectedBills.add(id);
+  else         state.selectedBills.delete(id);
+  render();
+}
+
+function selectAll(checked) {
+  if (checked) state.bills.forEach(b => state.selectedBills.add(b.id));
+  else         state.selectedBills.clear();
+  render();
+}
+
+function filterByType(type) {
+  if (!type) {
+    state.bills.forEach(b => state.selectedBills.add(b.id));
+  } else {
+    state.selectedBills.clear();
+    state.bills.filter(b => b.type === type).forEach(b => state.selectedBills.add(b.id));
+  }
+  render();
+}
+
+function exportExcel() {
+  const selected = state.bills.filter(b => state.selectedBills.has(b.id));
+  if (!selected.length) { alert('กรุณาเลือกรายการก่อนครับ'); return; }
+  const ws = XLSX.utils.json_to_sheet(selected.map(b => ({
+    'Sub Account': b.subAcc,
+    'ชื่อลูกค้า':  b.name,
+    'Carrier':     b.carrier,
+    'ประเภท':      b.type,
+    'รอบวันที่':   b.dateRange,
+    'Freight':     b.freight,
+    'COD':         b.cod,
+    'รวม VAT':     b.total,
+    'หมายเหตุ':    b.noReceipt ? 'ไม่ต้องปิดใบเสร็จ' : '',
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'รายการเปิดบิล');
+  XLSX.writeFile(wb, `เปิดบิล_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.xlsx`);
+}
+
+async function confirmBills() {
+  const selected = state.bills.filter(b => state.selectedBills.has(b.id));
+  if (!selected.length) { alert('กรุณาเลือกรายการก่อนครับ'); return; }
+
+  const total    = selected.reduce((s,b) => s+b.total, 0);
+  const totalFmt = total.toLocaleString('th-TH',{minimumFractionDigits:2});
+
+  if (!confirm(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
+
+  // เตรียม payload พร้อม flowName
+  const bills = selected.map(b => ({
+    subAcc:    b.subAcc,
+    flowName:  getFlowName(b.subAcc),
+    carrier:   b.carrier,
+    type:      b.type,
+    dateRange: b.dateRange,
+    freight:   b.freight || 0,
+    cod:       b.cod     || 0,
+    happy:     b.happy   || 0,
+    remote:    b.remote  || 0,
+    tourist:   b.tourist || 0,
+    pkg:       b.pkg     || 0,
+    total:     b.total,
+    noReceipt: b.noReceipt || false,
+  }));
+
+  // แสดง loading
+  const btn = document.querySelector('.btn-green');
+  const origText = btn?.innerHTML || '';
+  if (btn) btn.innerHTML = '<div class="spinner"></div> กำลังเปิดบิล...';
+
+  try {
+    const resp = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'saveBills', bills }),
+    });
+    const data = await resp.json();
+
+    if (!data.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+
+    const results = data.results || [];
+    const success = results.filter(r => r.ok).length;
+    const failed  = results.filter(r => !r.ok).length;
+
+    // แสดงผลลัพธ์
+    let msg = `เปิดบิลสำเร็จ ${success} รายการ`;
+    if (failed > 0) msg += `\nไม่สำเร็จ ${failed} รายการ`;
+
+    const invNos = results.filter(r => r.ok && r.invNo).map(r => `• ${r.subAcc}: ${r.invNo}`).join('\n');
+    if (invNos) msg += `\n\nINV No.:\n${invNos}`;
+    msg += `\n\nบันทึกลง Google Sheet แล้ว`;
+
+    alert(msg);
+
+    // อัปเดต state - ลบรายการที่เปิดไปแล้ว
+    const doneIds = new Set(results.filter(r=>r.ok).map(r=>r.subAcc));
+    state.bills = state.bills.filter(b => !doneIds.has(b.subAcc));
+    state.selectedBills = new Set(state.bills.map(b=>b.id));
+    document.getElementById('bill-count').textContent = state.bills.length;
+    render();
+
+  } catch(err) {
+    alert('เกิดข้อผิดพลาด: ' + err.message + '\n\nตรวจสอบว่า GAS Deploy เป็น Anyone แล้ว');
+  } finally {
+    if (btn) btn.innerHTML = origText;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
