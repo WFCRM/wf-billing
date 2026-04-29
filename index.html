@@ -1196,10 +1196,24 @@ async function confirmBills() {
   if (btn) btn.innerHTML = '<div class="spinner"></div> กำลังเปิดบิล...';
 
   try {
-    // ส่งผ่าน GET URL parameter เพื่อหลีกเลี่ยง CORS preflight
-    const payload = encodeURIComponent(JSON.stringify({ action: 'saveBills', bills }));
-    const resp = await fetch(GAS_URL + '?data=' + payload);
-    const data = await resp.json();
+    // ส่งทีละรายการเพื่อหลีกเลี่ยง URL length limit
+    const results = [];
+    for (const bill of bills) {
+      try {
+        const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill }));
+        const resp = await fetch(GAS_URL + '?data=' + payload);
+        const r    = await resp.json();
+        results.push({ subAcc: bill.subAcc, ok: r.ok, invNo: r.invNo, error: r.error });
+        // อัปเดต progress
+        const progMsg = document.createElement('div');
+        progMsg.className = 'log-line';
+        progMsg.innerHTML = `<span style="font-size:11px;color:${r.ok?'var(--green)':'var(--red)'}">${r.ok?'✓':'✗'} ${bill.name}: ${r.ok?r.invNo:r.error}</span>`;
+        document.querySelector('.log-panel')?.appendChild(progMsg);
+      } catch(e) {
+        results.push({ subAcc: bill.subAcc, ok: false, error: e.message });
+      }
+    }
+    const data = { ok: true, results };
 
     if (!data.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
 
