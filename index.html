@@ -1181,12 +1181,14 @@ async function confirmBills() {
   if (!confirm(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
 
   // เตรียม payload พร้อม flowName
+  const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
   const bills = selected.map(b => ({
     subAcc:    b.subAcc,
     flowName:  getFlowName(b.subAcc),
     carrier:   b.carrier,
     type:      b.type,
     dateRange: b.dateRange,
+    billDate:  selDate,
     freight:   b.freight || 0,
     cod:       b.cod     || 0,
     happy:     b.happy   || 0,
