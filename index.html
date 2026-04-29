@@ -628,6 +628,7 @@ async function loadCustomersFromSheet() {
   try {
     const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getCustomers' })));
     const data = await resp.json();
+    console.log('GAS getCustomers raw:', JSON.stringify(data).slice(0, 500));
     if (data.ok && data.customers && Object.keys(data.customers).length > 0) {
       state.customerTypes = data.customers;
       state.customersLoaded = true;
