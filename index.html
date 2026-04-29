@@ -1224,7 +1224,7 @@ async function confirmBills() {
 
     if (!data.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
 
-    const results = data.results || [];
+    // results ถูก declare แล้วข้างบน
     const success = results.filter(r => r.ok).length;
     const failed  = results.filter(r => !r.ok).length;
 
