@@ -448,6 +448,7 @@ let state = {
   trackingCarrier: 'Flash',
   currentPage: 'upload',
   calculating: false,
+  customersLoaded: false, // flag รอ loadCustomersFromSheet เสร็จก่อนคำนวณได้
 };
 
 // ─── Init ─────────────────────────────────────────────────────
@@ -611,22 +612,42 @@ function init() {
     }, 100);
   }
   // โหลด CustomerTypes จาก Google Sheet ทันทีที่เปิด Tool
-  loadCustomersFromSheet();
+  // ต้องรอโหลดเสร็จก่อนถึงจะกดคำนวณได้
+  state.customersLoaded = false;
   showPage('upload');
+  loadCustomersFromSheet();
 }
 
 async function loadCustomersFromSheet() {
+  // แสดงปุ่มคำนวณเป็น loading ก่อน
+  const calcBtn = document.getElementById('calc-btn');
+  if (calcBtn) {
+    calcBtn.disabled = true;
+    calcBtn.innerHTML = '<div class="spinner"></div> โหลดข้อมูลลูกค้า...';
+  }
   try {
     const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getCustomers' })));
     const data = await resp.json();
     if (data.ok && data.customers && Object.keys(data.customers).length > 0) {
       state.customerTypes = data.customers;
+      state.customersLoaded = true;
       console.log('โหลด CustomerTypes จาก Sheet:', Object.keys(data.customers).length, 'accounts');
-      // อัปเดต badge ใน nav
-      document.getElementById('bill-count').textContent = state.bills.length;
+    } else {
+      // ไม่มีข้อมูลใน Sheet ก็ยังให้ใช้งานได้ (ใช้ค่า default เงินสด)
+      state.customersLoaded = true;
+      console.log('CustomerTypes: ไม่มีข้อมูลใน Sheet ใช้ค่า default');
     }
   } catch(e) {
+    // fetch error — ยังให้ใช้งานได้ แต่ type จะเป็นค่า default
+    state.customersLoaded = true;
     console.log('loadCustomers error:', e.message);
+  } finally {
+    // คืนปุ่มคำนวณกลับปกติเสมอ
+    if (calcBtn) {
+      calcBtn.disabled = false;
+      calcBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2v8" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg> คำนวณรายการ';
+    }
+    document.getElementById('bill-count').textContent = state.bills.length;
   }
 }
 
@@ -791,11 +812,11 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   const dateCol    = headers.findIndex(h => String(h).trim() === 'Date');
   const accCol     = headers.findIndex(h => String(h).includes('Operated by') || String(h) === 'Operated by');
   const nameCol    = headers.findIndex(h => String(h).includes('Sub-account Name'));
-  const freightCol = headers.findIndex(h => String(h).trim() === 'Freight ');
-  const codCol     = headers.findIndex(h => String(h).trim() === 'COD ');
+  const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
+  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
   const happyCol   = headers.findIndex(h => String(h).includes('Happy Return'));
   const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
-  const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat'));
+  const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat') || String(h).includes('Total+Vat'));
   const touristCol = headers.findIndex(h => String(h).includes('พื้นที่ท่องเที่ยว'));
   const pkgCol     = headers.findIndex(h => String(h).includes('Packaging'));
 
@@ -861,8 +882,8 @@ function parseDHLDaily(sheets, targetDates) {
   const dateCol    = headers.findIndex(h => String(h).includes('Pick up date'));
   const accCol     = headers.findIndex(h => String(h).includes('Pick Up Account') && !String(h).includes('Name'));
   const nameCol    = headers.findIndex(h => String(h).includes('Pick Up Account Name') || String(h).includes('Customer Name'));
-  const freightCol = headers.findIndex(h => String(h).trim() === 'Freight');
-  const codCol     = headers.findIndex(h => String(h).trim() === 'COD');
+  const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
+  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
   const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
   const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat'));
   if (dateCol < 0 || accCol < 0) return [];
@@ -927,8 +948,8 @@ function parseSPXDaily(sheets, targetDates) {
   const dateCol    = headers.findIndex(h => String(h).trim() === 'Date');
   const accCol     = headers.findIndex(h => String(h).trim() === 'Account');
   const nameCol    = headers.findIndex(h => String(h).includes('Sub-account Name'));
-  const freightCol = headers.findIndex(h => String(h).trim() === 'Freight');
-  const codCol     = headers.findIndex(h => String(h).trim() === 'COD');
+  const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
+  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
   const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
   const totalCol   = headers.findIndex(h => String(h).includes('Total+Vat') || String(h).includes('Total รวม Vat'));
   if (accCol < 0) return [];
@@ -951,6 +972,11 @@ function parseSPXDaily(sheets, targetDates) {
 
 // ─── Calculate bills ──────────────────────────────────────────
 function calculateBills() {
+  // ป้องกันกดก่อน CustomerTypes โหลดเสร็จ
+  if (!state.customersLoaded) {
+    alert('กำลังโหลดข้อมูลลูกค้าจาก Sheet กรุณารอสักครู่แล้วลองอีกครั้งครับ');
+    return;
+  }
   const targetDates = getSelectedDates();
   if (!targetDates) { alert('กรุณาเลือกวันที่ก่อนครับ'); return; }
 
