@@ -442,7 +442,8 @@ let state = {
   files: {},        // key → { name, data, sheets }
   customerMap: {},  // subAccount → { name, type, carrier }
   bills: [],        // คำนวณแล้ว
-  customerTypes: {}, // Sub Account → ประเภท (อ่านจาก data ลค.)
+  customerTypes: {}, // Sub Account → { type, name } (อ่านจาก data ลค.)
+  customerPage: 1,
   selectedBills: new Set(),
   trackingCarrier: 'Flash',
   currentPage: 'upload',
@@ -451,61 +452,102 @@ let state = {
 
 // ─── Init ─────────────────────────────────────────────────────
 // ─── Customer page ───────────────────────────────────────────
-function renderCustomers() {
-  const count = Object.keys(state.customerTypes).length;
-  const types = ['Credit7D','Credit15D','Credit30D','เปิดบิลรวม','ไม่ต้องปิดใบเสร็จ','Internal(ไม่เปิดบิล)'];
-  const typeCount = {};
-  types.forEach(t => { typeCount[t] = 0; });
-  Object.values(state.customerTypes).forEach(t => { if (typeCount[t] !== undefined) typeCount[t]++; });
+const CUST_PAGE_SIZE = 20;
 
-  const rows = Object.entries(state.customerTypes)
-    .slice(0, 50)
-    .map(([acc, type]) => {
-      const badge = type === 'Credit7D'  ? 'badge-blue' :
-                    type === 'Credit15D' ? 'badge-purple' :
-                    type === 'เปิดบิลรวม' ? 'badge-amber' :
-                    type.includes('Internal') ? 'badge-red' : 'badge-gray';
-      return `<tr>
-        <td style="font-family:var(--font-mono);font-size:11px">${acc}</td>
-        <td><span class="badge ${badge}" style="font-size:10px">${type}</span></td>
-      </tr>`;
-    }).join('');
+function renderCustomers() {
+  const entries   = Object.entries(state.customerTypes);
+  const totalPages= Math.max(1, Math.ceil(entries.length / CUST_PAGE_SIZE));
+  const page      = Math.min(state.customerPage || 1, totalPages);
+  const pageData  = entries.slice((page-1)*CUST_PAGE_SIZE, page*CUST_PAGE_SIZE);
+
+  const typeColors = {
+    'Credit7D':'badge-blue','Credit15D':'badge-purple','Credit30D':'badge-red',
+    'เปิดบิลรวม':'badge-amber','ไม่ต้องปิดใบเสร็จ':'badge-gray',
+    'Internal(ไม่เปิดบิล)':'badge-red',
+  };
+
+  // summary
+  const summary = {};
+  entries.forEach(([,v]) => {
+    const t = v.type || 'เงินสด';
+    summary[t] = (summary[t]||0) + 1;
+  });
+
+  const summaryHtml = Object.entries(summary).map(([t,c]) =>
+    `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px">
+      <div style="font-weight:500">${c} accounts</div>
+      <div style="font-size:11px;color:var(--text3)">${t}</div>
+    </div>`).join('');
+
+  const rows = pageData.map(([acc, v]) => {
+    const badge = typeColors[v.type] || 'badge-gray';
+    return `<tr>
+      <td style="font-family:var(--font-mono);font-size:11px">${acc}</td>
+      <td style="font-size:12px">${v.name || '-'}</td>
+      <td><span class="badge ${badge}" style="font-size:10px">${v.type || 'เงินสด'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const pagerHtml = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm" onclick="changeCustPage(${page-1})" ${page<=1?'disabled':''}>← ก่อนหน้า</button>
+      <span style="font-size:12px;color:var(--text2)">หน้า ${page} / ${totalPages}</span>
+      <button class="btn btn-sm" onclick="changeCustPage(${page+1})" ${page>=totalPages?'disabled':''}>ถัดไป →</button>
+    </div>` : '';
+
+  const loaded = entries.length > 0;
 
   return `
   <div class="card">
     <div class="card-hd">
       <div class="card-title">อัปโหลดไฟล์ data ลค.</div>
-      ${count > 0 ? `<span class="badge badge-green">${count} accounts โหลดแล้ว</span>` : '<span class="badge badge-amber">ยังไม่มีข้อมูล</span>'}
+      <div style="display:flex;gap:6px;align-items:center">
+        ${loaded ? `<span class="badge badge-green">${entries.length} accounts โหลดแล้ว</span>` : '<span class="badge badge-amber">ยังไม่มีข้อมูล</span>'}
+        ${loaded ? `<button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="clearCustomers()">ล้างข้อมูล ✕</button>` : ''}
+      </div>
     </div>
     <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
-      <div style="font-size:12px;color:var(--text2)">อัปโหลดไฟล์ <strong>Dataลูกค้าเพื่อใช้เปิดใบวางบิล.xlsx</strong> เพื่อให้ระบบรู้ประเภทลูกค้าแต่ละ Sub Account</div>
+      <div style="font-size:12px;color:var(--text2)">อัปโหลดไฟล์ <strong>Dataลูกค้าเพื่อใช้เปิดใบวางบิล.xlsx</strong> — หากอัปโหลดซ้ำจะแทนที่ข้อมูลเดิมทั้งหมด</div>
       <label style="cursor:pointer">
         <input type="file" accept=".xlsx,.xls" onchange="handleCustomerFile(event)" style="display:none">
-        <div style="border:1.5px dashed var(--border2);border-radius:8px;padding:16px;text-align:center;background:var(--bg3)">
-          <div style="font-size:20px;margin-bottom:6px">📂</div>
-          <div style="font-size:12px;font-weight:500">คลิกเพื่ออัปโหลดไฟล์ data ลค.</div>
-          <div style="font-size:11px;color:var(--text3)">รองรับ .xlsx เท่านั้น</div>
+        <div style="border:1.5px dashed var(--border2);border-radius:8px;padding:14px;text-align:center;background:var(--bg3)">
+          <div style="font-size:18px;margin-bottom:4px">📂</div>
+          <div style="font-size:12px;font-weight:500">${loaded ? 'คลิกเพื่ออัปโหลดใหม่ (จะแทนที่ข้อมูลเดิม)' : 'คลิกเพื่ออัปโหลดไฟล์ data ลค.'}</div>
+          <div style="font-size:11px;color:var(--text3)">รองรับ .xlsx</div>
         </div>
       </label>
-      ${count > 0 ? `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${Object.entries(typeCount).filter(([,v])=>v>0).map(([t,v])=>
-          `<div style="background:var(--bg3);border-radius:6px;padding:8px 10px;font-size:12px">
-            <div style="font-weight:500">${v} accounts</div>
-            <div style="font-size:11px;color:var(--text3)">${t}</div>
-          </div>`).join('')}
-      </div>
-      <div class="card" style="margin-top:4px">
-        <div class="card-hd"><div class="card-title">รายการ (50 แรก จาก ${count})</div></div>
+      ${loaded ? `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${summaryHtml}</div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">รายการทั้งหมด</div>
+          <span style="font-size:11px;color:var(--text3)">แสดง ${(page-1)*CUST_PAGE_SIZE+1}–${Math.min(page*CUST_PAGE_SIZE,entries.length)} จาก ${entries.length}</span>
+        </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Sub Account</th><th>ประเภท</th></tr></thead>
+            <thead><tr><th>Sub Account</th><th>ชื่อลูกค้า</th><th>ประเภท</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
+        ${pagerHtml}
       </div>` : ''}
     </div>
   </div>`;
+}
+
+function changeCustPage(p) {
+  const total = Math.ceil(Object.keys(state.customerTypes).length / CUST_PAGE_SIZE);
+  state.customerPage = Math.max(1, Math.min(p, total));
+  const c = document.getElementById('main-content');
+  if (c) c.innerHTML = renderCustomers();
+}
+
+function clearCustomers() {
+  if (confirm('ล้างข้อมูลลูกค้าทั้งหมด ' + Object.keys(state.customerTypes).length + ' accounts?')) {
+    state.customerTypes = {};
+    state.customerPage  = 1;
+    render();
+  }
 }
 
 function handleCustomerFile(evt) {
@@ -513,8 +555,7 @@ function handleCustomerFile(evt) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const wb    = XLSX.read(e.target.result, { type: 'array' });
-    // หา sheet ที่มีชื่อ 'data ลค.'
+    const wb    = XLSX.read(e.target.result, { type:'array' });
     const sname = wb.SheetNames.find(n => n.includes('data ลค') || n.startsWith('data'));
     if (!sname) { alert('ไม่พบ sheet "data ลค." ในไฟล์ครับ'); return; }
     const rows  = XLSX.utils.sheet_to_json(wb.Sheets[sname], { header:1, defval:'' });
@@ -522,17 +563,20 @@ function handleCustomerFile(evt) {
     // คอลัมน์ขวา: J(9)=Sub Account, K(10)=ชื่อ, L(11)=ประเภท
     const map = {};
     for (let i = 1; i < rows.length; i++) {
-      const acc  = String(rows[i][9] || '').trim();
+      const acc  = String(rows[i][9]  || '').trim();
+      const name = String(rows[i][10] || '').trim();
       const type = String(rows[i][11] || '').trim();
-      if (acc && type) map[acc] = type;
+      if (acc && type) map[acc] = { name, type };
     }
+    // แทนที่ข้อมูลเดิมทั้งหมด
     state.customerTypes = map;
-    const count = Object.keys(map).length;
-    alert(`โหลดข้อมูลลูกค้าสำเร็จ: ${count} accounts\nรวมถึง Credit7D/15D/Internal ฯลฯ`);
+    state.customerPage  = 1;
+    alert('โหลดข้อมูลลูกค้าสำเร็จ: ' + Object.keys(map).length + ' accounts');
     render();
   };
   reader.readAsArrayBuffer(file);
 }
+
 
 function init() {
   const now = new Date();
@@ -911,7 +955,11 @@ function calculateBills() {
   }
 
   // ใช้ customerTypes ที่โหลดจากหน้า 'ข้อมูลลูกค้า'
-  const custTypeMap = state.customerTypes || {};
+  // แปลง customerTypes {acc: {type,name}} → {acc: type} สำหรับ shouldBillToday
+  const custTypeMap = {};
+  Object.entries(state.customerTypes || {}).forEach(([acc, v]) => {
+    custTypeMap[acc] = typeof v === 'string' ? v : (v.type || '');
+  });
 
   // parse ทุกไฟล์
   let rawBills = [];
