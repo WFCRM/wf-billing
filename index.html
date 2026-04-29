@@ -306,6 +306,10 @@ input[type=file] { display: none; }
       <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.1"/><path d="M7.5 4.5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
       ติดตามค้างชำระ
     </div>
+    <div class="nav-item" onclick="showPage('customers',this)">
+      <svg viewBox="0 0 15 15" fill="none"><circle cx="5.5" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.1"/><path d="M1 13c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/><path d="M11 7l2 2-2 2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      ข้อมูลลูกค้า
+    </div>
   </div>
 </div>
 
@@ -438,6 +442,7 @@ let state = {
   files: {},        // key → { name, data, sheets }
   customerMap: {},  // subAccount → { name, type, carrier }
   bills: [],        // คำนวณแล้ว
+  customerTypes: {}, // Sub Account → ประเภท (อ่านจาก data ลค.)
   selectedBills: new Set(),
   trackingCarrier: 'Flash',
   currentPage: 'upload',
@@ -445,6 +450,90 @@ let state = {
 };
 
 // ─── Init ─────────────────────────────────────────────────────
+// ─── Customer page ───────────────────────────────────────────
+function renderCustomers() {
+  const count = Object.keys(state.customerTypes).length;
+  const types = ['Credit7D','Credit15D','Credit30D','เปิดบิลรวม','ไม่ต้องปิดใบเสร็จ','Internal(ไม่เปิดบิล)'];
+  const typeCount = {};
+  types.forEach(t => { typeCount[t] = 0; });
+  Object.values(state.customerTypes).forEach(t => { if (typeCount[t] !== undefined) typeCount[t]++; });
+
+  const rows = Object.entries(state.customerTypes)
+    .slice(0, 50)
+    .map(([acc, type]) => {
+      const badge = type === 'Credit7D'  ? 'badge-blue' :
+                    type === 'Credit15D' ? 'badge-purple' :
+                    type === 'เปิดบิลรวม' ? 'badge-amber' :
+                    type.includes('Internal') ? 'badge-red' : 'badge-gray';
+      return `<tr>
+        <td style="font-family:var(--font-mono);font-size:11px">${acc}</td>
+        <td><span class="badge ${badge}" style="font-size:10px">${type}</span></td>
+      </tr>`;
+    }).join('');
+
+  return `
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">อัปโหลดไฟล์ data ลค.</div>
+      ${count > 0 ? `<span class="badge badge-green">${count} accounts โหลดแล้ว</span>` : '<span class="badge badge-amber">ยังไม่มีข้อมูล</span>'}
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;color:var(--text2)">อัปโหลดไฟล์ <strong>Dataลูกค้าเพื่อใช้เปิดใบวางบิล.xlsx</strong> เพื่อให้ระบบรู้ประเภทลูกค้าแต่ละ Sub Account</div>
+      <label style="cursor:pointer">
+        <input type="file" accept=".xlsx,.xls" onchange="handleCustomerFile(event)" style="display:none">
+        <div style="border:1.5px dashed var(--border2);border-radius:8px;padding:16px;text-align:center;background:var(--bg3)">
+          <div style="font-size:20px;margin-bottom:6px">📂</div>
+          <div style="font-size:12px;font-weight:500">คลิกเพื่ออัปโหลดไฟล์ data ลค.</div>
+          <div style="font-size:11px;color:var(--text3)">รองรับ .xlsx เท่านั้น</div>
+        </div>
+      </label>
+      ${count > 0 ? `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${Object.entries(typeCount).filter(([,v])=>v>0).map(([t,v])=>
+          `<div style="background:var(--bg3);border-radius:6px;padding:8px 10px;font-size:12px">
+            <div style="font-weight:500">${v} accounts</div>
+            <div style="font-size:11px;color:var(--text3)">${t}</div>
+          </div>`).join('')}
+      </div>
+      <div class="card" style="margin-top:4px">
+        <div class="card-hd"><div class="card-title">รายการ (50 แรก จาก ${count})</div></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Sub Account</th><th>ประเภท</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function handleCustomerFile(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb    = XLSX.read(e.target.result, { type: 'array' });
+    // หา sheet ที่มีชื่อ 'data ลค.'
+    const sname = wb.SheetNames.find(n => n.includes('data ลค') || n.startsWith('data'));
+    if (!sname) { alert('ไม่พบ sheet "data ลค." ในไฟล์ครับ'); return; }
+    const rows  = XLSX.utils.sheet_to_json(wb.Sheets[sname], { header:1, defval:'' });
+
+    // คอลัมน์ขวา: J(9)=Sub Account, K(10)=ชื่อ, L(11)=ประเภท
+    const map = {};
+    for (let i = 1; i < rows.length; i++) {
+      const acc  = String(rows[i][9] || '').trim();
+      const type = String(rows[i][11] || '').trim();
+      if (acc && type) map[acc] = type;
+    }
+    state.customerTypes = map;
+    const count = Object.keys(map).length;
+    alert(`โหลดข้อมูลลูกค้าสำเร็จ: ${count} accounts\nรวมถึง Credit7D/15D/Internal ฯลฯ`);
+    render();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function init() {
   const now = new Date();
   const dateStr = `${now.getDate()} ${MONTHS_TH[now.getMonth()]} ${now.getFullYear()} (วัน${DAYS_TH[now.getDay()]})`;
@@ -490,7 +579,8 @@ function showPage(page, el) {
     overview: ['ภาพรวม','สถานะการเปิดบิลประจำวัน'],
     upload:   ['อัปโหลดไฟล์รายงาน','เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ'],
     bills:    ['รายการเปิดบิลวันนี้','คำนวณจากไฟล์ที่อัปโหลด แยกตามประเภทลูกค้า'],
-    tracking: ['ติดตามค้างชำระ','สถานะการชำระเงินของลูกค้าทั้งหมด'],
+    tracking:  ['ติดตามค้างชำระ','สถานะการชำระเงินของลูกค้าทั้งหมด'],
+    customers: ['ข้อมูลลูกค้า','อัปโหลดไฟล์ data ลค. เพื่อกำหนดประเภทการเปิดบิล'],
   };
   const [title, sub] = titles[page] || ['',''];
   document.getElementById('page-title').textContent = title;
@@ -504,6 +594,7 @@ function render() {
   if      (state.currentPage === 'upload')   c.innerHTML = renderUpload();
   else if (state.currentPage === 'bills')    c.innerHTML = renderBills();
   else if (state.currentPage === 'tracking') { renderTracking(); return; }
+  else if (state.currentPage === 'customers') { c.innerHTML = renderCustomers(); return; }
   else                                        c.innerHTML = renderOverview();
 
   // Show/hide calc btn and date selector
@@ -819,19 +910,8 @@ function calculateBills() {
     return `${first}–${last}`;
   }
 
-  // อ่าน customer type map
-  const custTypeMap = {};
-  Object.values(state.files).forEach(f => {
-    const dsname = Object.keys(f.sheets).find(n => n.includes('data ลค') || n.startsWith('data'));
-    if (!dsname) return;
-    const rows = f.sheets[dsname];
-    for (let i = 1; i < rows.length; i++) {
-      const row  = rows[i];
-      const acc  = String(row[9] || '').trim();
-      const type = String(row[11] || '').trim();
-      if (acc && type) custTypeMap[acc] = type;
-    }
-  });
+  // ใช้ customerTypes ที่โหลดจากหน้า 'ข้อมูลลูกค้า'
+  const custTypeMap = state.customerTypes || {};
 
   // parse ทุกไฟล์
   let rawBills = [];
@@ -1181,7 +1261,8 @@ async function confirmBills() {
   if (!confirm(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
 
   // เตรียม payload พร้อม flowName
-  const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
+  const selDate = document.getElementById('bill-date')?.value;
+  if (!selDate) { alert('กรุณาเลือกวันที่รับงานก่อนเปิดบิลครับ'); return; }
   const bills = selected.map(b => ({
     subAcc:    b.subAcc,
     flowName:  getFlowName(b.subAcc),
@@ -1189,13 +1270,13 @@ async function confirmBills() {
     type:      b.type,
     dateRange: b.dateRange,
     billDate:  selDate,
-    freight:   b.freight || 0,
-    cod:       b.cod     || 0,
-    happy:     b.happy   || 0,
-    remote:    b.remote  || 0,
-    tourist:   b.tourist || 0,
-    pkg:       b.pkg     || 0,
-    total:     b.total,
+    freight:   parseFloat(b.freight)  || 0,
+    cod:       parseFloat(b.cod)      || 0,
+    happy:     parseFloat(b.happy)    || 0,
+    remote:    parseFloat(b.remote)   || 0,
+    tourist:   parseFloat(b.tourist)  || 0,
+    pkg:       parseFloat(b.pkg)      || 0,
+    total:     parseFloat(b.total)    || 0,
     noReceipt: b.noReceipt || false,
   }));
 
