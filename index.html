@@ -1112,11 +1112,19 @@ function calculateBills() {
   // กำหนด type + กรอง internal
   const bills = [];
   const mergedGroups = {};
+  const accumulateRaw = []; // เก็บลูกค้าเปิดบิลรวมแยกออกมาก่อน
 
   for (const b of rawBills) {
     const custType = b.overrideType || lookupType(b.acc, b.name) || '';
     console.log(`[lookup] acc="${b.acc}" name="${b.name}" → type="${custType}"`);
     if (SKIP_TYPES.some(s => custType.includes(s))) continue;
+
+    // ─ เปิดบิลรวม: บันทึกสะสมทุกวัน ไม่ต้องรอเงื่อนไขวัน ─
+    if (isAccumulateType(custType)) {
+      accumulateRaw.push({ ...b, type: custType });
+      continue;
+    }
+
     if (!shouldBillToday(custType || 'เงินสด')) continue;
 
     // special group
@@ -1169,28 +1177,37 @@ function calculateBills() {
   Object.values(mergedGroups).forEach(g => bills.push(g));
   bills.forEach((b,i) => b.id = i+1);
 
-  // แยก เปิดบิลรวม ออก
-  const accumulateBills = bills.filter(b => isAccumulateType(b.type));
-  const normalBills     = bills.filter(b => !isAccumulateType(b.type));
+  // normalBills = รายการที่เปิดบิลวันนี้ (ไม่มีเปิดบิลรวมแล้ว เพราะแยกออกไป accumulateRaw)
+  const normalBills = bills;
 
-  // บันทึก เปิดบิลรวม ลง Sheet อัตโนมัติ
-  if (accumulateBills.length > 0) {
+  // บันทึก เปิดบิลรวม ลง Sheet ทุกวันที่กดคำนวณ
+  if (accumulateRaw.length > 0) {
     const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
-    const accPayload = accumulateBills.map(b => ({
-      subAcc:    b.subAcc,
-      flowName:  getFlowName(b.subAcc),
+    const accPayload = accumulateRaw.map(b => ({
+      subAcc:    b.acc,
+      flowName:  getFlowName(b.acc),
       carrier:   b.carrier,
       type:      b.type,
-      dateRange: b.dateRange,
+      dateRange: getDateRange(),
       billDate:  selDate,
-      freight:   parseFloat(b.freight)  || 0,
-      cod:       parseFloat(b.cod)      || 0,
-      total:     parseFloat(b.total)    || 0,
-      noReceipt: b.noReceipt || false,
+      freight:   parseFloat(b.freight) || 0,
+      cod:       parseFloat(b.cod)     || 0,
+      total:     parseFloat(b.total)   || 0,
+      noReceipt: false,
     }));
     const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulate', bills: accPayload }));
-    fetch(GAS_URL + '?data=' + p).catch(e => console.log('saveAccumulate error:', e));
-    console.log('บันทึกเปิดบิลรวม', accumulateBills.length, 'รายการลง Sheet');
+    fetch(GAS_URL + '?data=' + p)
+      .then(r => r.json())
+      .then(d => {
+        console.log('saveAccumulate:', d.ok, 'saved:', d.saved);
+        if (d.ok) {
+          // แสดง alert แจ้งว่าบันทึกเปิดบิลรวมแล้ว
+          const names = accumulateRaw.map(b => `• ${getFlowName(b.acc)} (${b.acc})`).join('\n');
+          alert(`📋 บันทึกลูกค้าเปิดบิลรวม ${accumulateRaw.length} รายการลง Sheet แล้ว\n\n${names}\n\nยอดรวมจะถูกเปิดบิลสิ้นเดือน`);
+        }
+      })
+      .catch(e => console.log('saveAccumulate error:', e));
+    console.log('บันทึกเปิดบิลรวม', accumulateRaw.length, 'รายการลง Sheet');
   }
 
   state.bills = normalBills;
