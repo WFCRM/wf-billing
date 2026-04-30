@@ -896,19 +896,26 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, flashCare:0, boxShield:0, total:0 };
-    grouped[acc].freight   += parseFloat(row[freightCol])   || 0;
-    grouped[acc].cod       += parseFloat(row[codCol])       || 0;
-    grouped[acc].happy     += parseFloat(row[happyCol])     || 0;
-    grouped[acc].remote    += parseFloat(row[remoteCol])    || 0;
-    grouped[acc].tourist   += parseFloat(row[touristCol])   || 0;
-    grouped[acc].pkg       += parseFloat(row[pkgCol])       || 0;
-    grouped[acc].flashCare += parseFloat(row[flashCareCol]) || 0;
-    grouped[acc].boxShield += parseFloat(row[boxShieldCol]) || 0;
-    grouped[acc].total     += parseFloat(row[totalVatCol])  || 0;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, flashCare:0, boxShield:0, total:0 };
+    const f = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    grouped[acc].trackingCount += 1;
+    grouped[acc].freight   += f(row[freightCol]);
+    grouped[acc].cod       += f(row[codCol]);
+    grouped[acc].happy     += f(row[happyCol]);
+    grouped[acc].remote    += f(row[remoteCol]);
+    grouped[acc].tourist   += f(row[touristCol]);
+    grouped[acc].pkg       += f(row[pkgCol]);
+    grouped[acc].flashCare += f(row[flashCareCol]);
+    grouped[acc].boxShield += f(row[boxShieldCol]);
+    grouped[acc].total     += f(row[totalVatCol]);
   }
   // คำนวณ VAT สำหรับ COD, Flash Care, Box Shield
   Object.values(grouped).forEach(b => {
+    // ถ้า totalVatCol ไม่ได้ให้ค่า (formula string) ให้คำนวณเอง
+    if (b.total === 0) {
+      const vatBase = b.cod + b.flashCare + b.boxShield;
+      b.total = parseFloat((b.freight + b.happy + b.remote + b.tourist + b.pkg + vatBase + (vatBase * VAT_RATE)).toFixed(2));
+    }
     b.codVat       = b.cod       > 0 ? parseFloat((b.cod       * VAT_RATE).toFixed(2)) : 0;
     b.flashCareVat = b.flashCare > 0 ? parseFloat((b.flashCare * VAT_RATE).toFixed(2)) : 0;
     b.boxShieldVat = b.boxShield > 0 ? parseFloat((b.boxShield * VAT_RATE).toFixed(2)) : 0;
@@ -976,17 +983,21 @@ function parseDHLDaily(sheets, targetDates) {
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'DHL', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, paperPod:0, insurance:0, amDeliv:0, total:0 };
-    grouped[acc].freight   += parseFloat(row[freightCol])   || 0;
-    grouped[acc].cod       += parseFloat(row[codCol])       || 0;
-    grouped[acc].remote    += parseFloat(row[remoteCol])    || 0;
-    grouped[acc].paperPod  += parseFloat(row[paperPodCol])  || 0;
-    grouped[acc].insurance += parseFloat(row[insuranceCol]) || 0;
-    grouped[acc].amDeliv   += parseFloat(row[amDelivCol])   || 0;
-    grouped[acc].total     += parseFloat(row[totalVatCol])  || 0;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'DHL', trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, paperPod:0, insurance:0, amDeliv:0, total:0 };
+    const f = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    grouped[acc].trackingCount += 1;
+    grouped[acc].freight   += f(row[freightCol]);
+    grouped[acc].cod       += f(row[codCol]);
+    grouped[acc].remote    += f(row[remoteCol]);
+    grouped[acc].paperPod  += f(row[paperPodCol]);
+    grouped[acc].insurance += f(row[insuranceCol]);
+    grouped[acc].amDeliv   += f(row[amDelivCol]);
   }
-  // คำนวณ VAT สำหรับรายการที่มี VAT
+  // คำนวณ total เอง (ไม่ใช้ formula col เพราะ XLSX.js อ่านได้แค่ string)
+  // VAT applies to: cod, insurance, paperPod, amDeliv
   Object.values(grouped).forEach(b => {
+    const vatBase = b.cod + b.insurance + b.paperPod + b.amDeliv;
+    b.total = parseFloat((b.freight + b.remote + vatBase + (vatBase * VAT_RATE)).toFixed(2));
     b.codVat       = b.cod       > 0 ? parseFloat((b.cod       * VAT_RATE).toFixed(2)) : 0;
     b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
     b.paperPodVat  = b.paperPod  > 0 ? parseFloat((b.paperPod  * VAT_RATE).toFixed(2)) : 0;
@@ -1183,24 +1194,30 @@ function calculateBills() {
     }
 
     const bill = {
-      id:        0,
-      subAcc:    b.acc,
-      name:      groupName || b.name,
-      flowName:  getFlowName(b.acc),
-      carrier:   b.carrier,
-      type:      custType || 'เงินสด',
-      freight:   b.freight,
-      cod:       b.cod,
-      happy:     b.happy || 0,
-      remote:    b.remote || 0,
-      tourist:   b.tourist || 0,
-      pkg:       b.pkg || 0,
-      total:     b.total,
-      dateRange: getDateRange(),
-      noReceipt: custType === 'ไม่ต้องปิดใบเสร็จ',
-      isGroup:   !!groupName,
+      id:            0,
+      subAcc:        b.acc,
+      name:          groupName || b.name,
+      flowName:      getFlowName(b.acc),
+      carrier:       b.carrier,
+      type:          custType || 'เงินสด',
+      trackingCount: b.trackingCount || 0,
+      freight:       b.freight    || 0,
+      cod:           b.cod        || 0,
+      happy:         b.happy      || 0,
+      remote:        b.remote     || 0,
+      tourist:       b.tourist    || 0,
+      pkg:           b.pkg        || 0,
+      flashCare:     b.flashCare  || 0,
+      boxShield:     b.boxShield  || 0,
+      paperPod:      b.paperPod   || 0,
+      insurance:     b.insurance  || 0,
+      amDeliv:       b.amDeliv    || 0,
+      total:         b.total,
+      dateRange:     getDateRange(),
+      noReceipt:     custType === 'ไม่ต้องปิดใบเสร็จ',
+      isGroup:       !!groupName,
       groupKey,
-      lineItems: buildLineItems(b),
+      lineItems:     buildLineItems(b),
     };
 
     if (groupKey) {
@@ -1327,6 +1344,7 @@ function renderBills() {
       <td><span class="badge ${carrierBadge}" style="font-size:10px">${b.carrier}</span></td>
       <td><span class="badge ${typeBadge}" style="font-size:10px">${b.type}</span></td>
       <td class="muted" style="font-size:11px">${b.dateRange}</td>
+      <td class="right mono" style="font-size:11px">${b.trackingCount > 0 ? b.trackingCount+' ชิ้น' : '–'}</td>
       <td class="right mono">${(parseFloat(b.freight)||0) > 0 ? '฿'+(parseFloat(b.freight)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
       <td class="right mono">${(parseFloat(b.cod)||0) > 0 ? '฿'+(parseFloat(b.cod)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}) : '–'}</td>
       <td class="right mono" style="font-weight:500">฿${b.total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
@@ -1370,6 +1388,7 @@ function renderBills() {
             <th>Carrier</th>
             <th>ประเภท</th>
             <th>รอบวันที่</th>
+            <th class="right">พัสดุ</th>
             <th class="right">Freight</th>
             <th class="right">COD</th>
             <th class="right">รวม VAT</th>
@@ -1407,6 +1426,7 @@ async function renderTracking() {
     const rows = data.rows || [];
     const pending = rows.filter(r => r['สถานะ'] === 'รอชำระ');
     const paid    = rows.filter(r => r['สถานะ'] === 'ชำระแล้ว');
+    const overdue = pending.filter(r => r['วันครบกำหนด'] && isOverdueDate(r['วันครบกำหนด']));
 
     const tabs = ['Flash','DHL','WefastD','SPX'].map(n =>
       `<div class="tab ${n===carrier?'active':''}" onclick="state.trackingCarrier='${n}';renderTracking()">${n}</div>`
@@ -1438,9 +1458,16 @@ async function renderTracking() {
         }).join('');
 
     c.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div></div>
+      <button class="btn btn-sm" onclick="syncFlowaccount(this)" style="font-size:11px">
+        🔄 Sync จาก Flowaccount
+      </button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
       <div class="metric"><div class="metric-label">ทั้งหมด</div><div class="metric-value" style="color:var(--blue)">${rows.length}</div><div class="metric-sub">รายการ</div></div>
       <div class="metric"><div class="metric-label">รอชำระ</div><div class="metric-value" style="color:var(--amber)">${pending.length}</div><div class="metric-sub">รายการ</div></div>
+      <div class="metric"><div class="metric-label">เกินกำหนด</div><div class="metric-value" style="color:var(--red)">${overdue.length}</div><div class="metric-sub">รายการ</div></div>
       <div class="metric"><div class="metric-label">ชำระแล้ว</div><div class="metric-value" style="color:var(--green)">${paid.length}</div><div class="metric-sub">รายการ</div></div>
     </div>
     <div class="card">
@@ -1470,7 +1497,25 @@ function isOverdueDate(dateStr) {
   return d < new Date();
 }
 
-async function markPaid(blNo, carrier) {
+async function syncFlowaccount(btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> กำลัง Sync...';
+  try {
+    const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'syncFlow' })));
+    const data = await resp.json();
+    if (data.ok) {
+      btn.innerHTML = '✅ Sync เสร็จ (' + data.updated + ' รายการ)';
+      setTimeout(() => renderTracking(), 1000);
+    } else {
+      btn.innerHTML = '❌ ' + (data.error || 'เกิดข้อผิดพลาด');
+    }
+  } catch(e) {
+    btn.innerHTML = '❌ ' + e.message;
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 3000);
+  }
+}
   if (!blNo || blNo === '-') { alert('ไม่มี BL No.'); return; }
   const paidDate   = prompt('วันที่ชำระ (dd/mm/yyyy):', new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}));
   if (!paidDate) return;
@@ -1500,10 +1545,111 @@ async function markPaid(blNo, carrier) {
 
 // ─── Overview page ────────────────────────────────────────────
 function renderOverview() {
-  return `<div class="card"><div class="empty">
-    กด "อัปโหลดไฟล์" เพื่อเริ่มต้นใช้งานครับ
-    <br><br><button class="btn btn-primary btn-sm" onclick="showPage('upload',this)">เริ่มต้น →</button>
-  </div></div>`;
+  const bills = state.bills;
+  const hasFiles = Object.keys(state.files).length > 0;
+
+  if (!hasFiles) {
+    return `<div class="card" style="text-align:center;padding:40px 20px">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 16px;display:block;opacity:.3">
+        <rect x="8" y="8" width="32" height="32" rx="4" stroke="currentColor" stroke-width="2"/>
+        <path d="M24 16v16M16 24h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="font-size:14px;font-weight:500;margin-bottom:8px">ยังไม่มีข้อมูล</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:20px">อัปโหลดไฟล์รายงานเพื่อเริ่มต้นใช้งาน</div>
+      <button class="btn btn-primary btn-sm" onclick="showPage('upload',this)">เริ่มต้น →</button>
+    </div>`;
+  }
+
+  // สรุปจาก bills ที่คำนวณแล้ว
+  const totalBills  = bills.length;
+  const totalAmt    = bills.reduce((s,b) => s + b.total, 0);
+  const byCarrier   = {};
+  bills.forEach(b => {
+    const c = b.carrier.replace(' WF','').replace(' GAP','');
+    if (!byCarrier[c]) byCarrier[c] = { count:0, total:0 };
+    byCarrier[c].count++;
+    byCarrier[c].total += b.total;
+  });
+  const byType = {};
+  bills.forEach(b => {
+    if (!byType[b.type]) byType[b.type] = 0;
+    byType[b.type]++;
+  });
+
+  const carrierRows = Object.entries(byCarrier).map(([c,d]) => `
+    <tr>
+      <td><span class="badge badge-${c==='Flash'?'blue':c==='DHL'?'gray':c==='WefastD'?'purple':'amber'}" style="font-size:10px">${c}</span></td>
+      <td class="right" style="font-size:12px">${d.count} ราย</td>
+      <td class="right mono" style="font-size:12px;font-weight:500">฿${d.total.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+    </tr>`).join('');
+
+  const typeRows = Object.entries(byType).map(([t,n]) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span class="badge badge-${t==='Credit7D'?'blue':t==='Credit15D'?'purple':t==='Credit30D'?'red':t==='เงินสด'?'green':'gray'}" style="font-size:10px">${t}</span>
+      <span style="font-size:12px;font-weight:500">${n} ราย</span>
+    </div>`).join('');
+
+  const selDate = document.getElementById('bill-date')?.value || '-';
+  const selDateDisplay = selDate !== '-' ? new Date(selDate).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}) : '-';
+
+  return `
+  <div class="grid-4" style="margin-bottom:12px">
+    <div class="metric">
+      <div class="metric-label">รายการวันนี้</div>
+      <div class="metric-value" style="color:var(--blue)">${totalBills}</div>
+      <div class="metric-sub">${selDateDisplay}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">ยอดรวมทั้งหมด</div>
+      <div class="metric-value" style="color:var(--text);font-size:16px">฿${totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})}</div>
+      <div class="metric-sub">รวม VAT</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">ไฟล์ที่โหลด</div>
+      <div class="metric-value" style="color:var(--green)">${Object.keys(state.files).length}</div>
+      <div class="metric-sub">จาก 5 ไฟล์</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">รอเปิดบิล</div>
+      <div class="metric-value" style="color:var(--amber)">${totalBills}</div>
+      <div class="metric-sub">รายการ</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-hd"><div class="card-title">ยอดแยกตาม Carrier</div></div>
+      <div class="card-body">
+        ${totalBills === 0 ? '<div class="empty" style="padding:20px">กดคำนวณรายการก่อน</div>' :
+        `<table class="tbl" style="font-size:12px">
+          <thead><tr><th>Carrier</th><th class="right">จำนวน</th><th class="right">ยอด VAT</th></tr></thead>
+          <tbody>${carrierRows}</tbody>
+          <tfoot><tr style="font-weight:600;border-top:2px solid var(--border)">
+            <td>รวม</td>
+            <td class="right">${totalBills} ราย</td>
+            <td class="right mono">฿${totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+          </tr></tfoot>
+        </table>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-title">แยกตามประเภทลูกค้า</div></div>
+      <div class="card-body">
+        ${totalBills === 0 ? '<div class="empty" style="padding:20px">กดคำนวณรายการก่อน</div>' : typeRows}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0">
+    <div class="card-hd">
+      <div class="card-title">ทางลัด</div>
+    </div>
+    <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="showPage('upload',this)">📁 อัปโหลดไฟล์</button>
+      <button class="btn btn-sm" onclick="showPage('bills',this)">📋 รายการเปิดบิล (${totalBills})</button>
+      <button class="btn btn-sm" onclick="showPage('tracking',this)">💰 ติดตามค้างชำระ</button>
+    </div>
+  </div>`;
 }
 
 // ─── Actions ──────────────────────────────────────────────────
@@ -1582,25 +1728,26 @@ async function confirmBills() {
   const bills = selected.map(b => ({
     subAcc:    b.subAcc,
     flowName:  getFlowName(b.subAcc),
-    carrier:   b.carrier,
-    type:      b.type,
-    dateRange: b.dateRange,
-    billDate:  selDate,
-    freight:   parseFloat(b.freight)   || 0,
-    cod:       parseFloat(b.cod)       || 0,
-    happy:     parseFloat(b.happy)     || 0,
-    remote:    parseFloat(b.remote)    || 0,
-    tourist:   parseFloat(b.tourist)   || 0,
-    pkg:       parseFloat(b.pkg)       || 0,
+    carrier:       b.carrier,
+    type:          b.type,
+    dateRange:     b.dateRange,
+    billDate:      selDate,
+    trackingCount: b.trackingCount || 0,
+    freight:       parseFloat(b.freight)   || 0,
+    cod:           parseFloat(b.cod)       || 0,
+    happy:         parseFloat(b.happy)     || 0,
+    remote:        parseFloat(b.remote)    || 0,
+    tourist:       parseFloat(b.tourist)   || 0,
+    pkg:           parseFloat(b.pkg)       || 0,
     // Flash
-    flashCare: parseFloat(b.flashCare) || 0,
-    boxShield: parseFloat(b.boxShield) || 0,
+    flashCare:     parseFloat(b.flashCare) || 0,
+    boxShield:     parseFloat(b.boxShield) || 0,
     // DHL
-    paperPod:  parseFloat(b.paperPod)  || 0,
-    insurance: parseFloat(b.insurance) || 0,
-    amDeliv:   parseFloat(b.amDeliv)   || 0,
-    total:     parseFloat(b.total)     || 0,
-    noReceipt: b.noReceipt || false,
+    paperPod:      parseFloat(b.paperPod)  || 0,
+    insurance:     parseFloat(b.insurance) || 0,
+    amDeliv:       parseFloat(b.amDeliv)   || 0,
+    total:         parseFloat(b.total)     || 0,
+    noReceipt:     b.noReceipt || false,
   }));
 
   // แสดง loading
