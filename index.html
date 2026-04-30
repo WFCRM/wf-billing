@@ -6,42 +6,53 @@
 <title>WhaleFast — เปิดบิลรายรับ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #f7f6f3;
-  --bg2: #ffffff;
-  --bg3: #f0efe9;
-  --border: #e4e2da;
-  --border2: #d0cec4;
-  --text: #1a1915;
-  --text2: #6b6960;
-  --text3: #a8a69e;
-  --blue: #1a56db;
-  --blue-bg: #eff4ff;
-  --blue-border: #c3d2f7;
-  --green: #057a55;
-  --green-bg: #f0fdf4;
-  --green-border: #a7f3d0;
-  --amber: #92400e;
-  --amber-bg: #fffbeb;
-  --amber-border: #fcd34d;
-  --red: #9b1c1c;
-  --red-bg: #fef2f2;
-  --red-border: #fca5a5;
-  --purple: #5521b5;
-  --purple-bg: #f5f3ff;
-  --purple-border: #c4b5fd;
+  --bg:      #f5f4f0;
+  --bg2:     #ffffff;
+  --bg3:     #eeede8;
+  --border:  #e2e0d8;
+  --border2: #ccc9be;
+  --text:    #1c1b17;
+  --text2:   #5c5a52;
+  --text3:   #9c9a92;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Brand */
+  --blue:        #1b4fff;
+  --blue-bg:     #eff3ff;
+  --blue-border: #bfcfff;
+  --green:       #0a7c55;
+  --green-bg:    #edfaf3;
+  --green-border:#a3e9c8;
+  --amber:       #8a5000;
+  --amber-bg:    #fff8e6;
+  --amber-border:#fcd97a;
+  --red:         #9b1c1c;
+  --red-bg:      #fff1f1;
+  --red-border:  #fca5a5;
+  --purple:      #5b21b6;
+  --purple-bg:   #f5f0ff;
+  --purple-border:#c4b5fd;
+  --gray:        #4b4a47;
+  --gray-bg:     #f0efeb;
+  --gray-border: #d6d4cc;
+
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.1), 0 2px 4px rgba(0,0,0,.06);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-family: 'Sarabun', sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
   min-height: 100vh;
 }
 
@@ -49,54 +60,54 @@ body {
 
 /* Sidebar */
 .sidebar {
-  width: 220px;
-  background: var(--bg2);
-  border-right: 1px solid var(--border);
+  width: 224px;
+  background: var(--text);
+  border-right: none;
   padding: 0;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
 }
 .logo {
-  padding: 20px 18px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 22px 18px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
 }
 .logo-mark {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 10px;
 }
 .logo-icon {
-  width: 28px; height: 28px; background: var(--text);
-  border-radius: 6px; display: flex; align-items: center;
+  width: 32px; height: 32px; background: var(--blue);
+  border-radius: 8px; display: flex; align-items: center;
   justify-content: center;
 }
-.logo-icon svg { width: 16px; height: 16px; }
-.logo-name { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -.3px; }
-.logo-sub { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 3px; }
+.logo-icon svg { width: 18px; height: 18px; }
+.logo-name { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.4px; }
+.logo-sub { font-size: 11px; color: rgba(255,255,255,.4); font-family: var(--font-mono); margin-top: 2px; }
 
-.nav { padding: 10px 0; flex: 1; }
+.nav { padding: 12px 0; flex: 1; }
 .nav-section {
-  padding: 10px 18px 4px;
-  font-size: 10px; font-weight: 500;
-  color: var(--text3); letter-spacing: .8px; text-transform: uppercase;
+  padding: 12px 18px 5px;
+  font-size: 10px; font-weight: 600;
+  color: rgba(255,255,255,.3); letter-spacing: 1px; text-transform: uppercase;
 }
 .nav-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 18px; font-size: 13px; color: var(--text2);
-  cursor: pointer; transition: all .12s;
-  border-left: 2px solid transparent;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px 9px 18px; font-size: 13px; color: rgba(255,255,255,.55);
+  cursor: pointer; transition: all .13s; border-radius: 0;
+  border-left: 2px solid transparent; margin: 1px 0;
 }
-.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item:hover { background: rgba(255,255,255,.07); color: rgba(255,255,255,.9); }
 .nav-item.active {
-  color: var(--blue); background: var(--blue-bg);
-  border-left-color: var(--blue); font-weight: 500;
+  color: #fff; background: rgba(27,79,255,.35);
+  border-left-color: var(--blue); font-weight: 600;
 }
-.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .7; }
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .6; }
 .nav-item.active svg { opacity: 1; }
 
 .nav-badge {
-  margin-left: auto; padding: 1px 6px;
+  margin-left: auto; padding: 2px 7px;
   background: var(--blue); color: #fff;
-  border-radius: 10px; font-size: 10px; font-weight: 500;
+  border-radius: 10px; font-size: 10px; font-weight: 600;
 }
 
 /* Main */
@@ -105,73 +116,80 @@ body {
 .topbar {
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
-  padding: 14px 24px;
+  padding: 16px 28px;
   display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: 10;
+  box-shadow: 0 1px 0 var(--border);
 }
-.topbar-left { display: flex; flex-direction: column; gap: 1px; }
-.topbar-title { font-size: 15px; font-weight: 600; color: var(--text); }
-.topbar-sub { font-size: 12px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+.topbar-left { display: flex; flex-direction: column; gap: 2px; }
+.topbar-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+.topbar-sub { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 
-.content { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.content { padding: 24px 28px; display: flex; flex-direction: column; gap: 18px; }
 
 /* Buttons */
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 14px; font-size: 12px; font-family: inherit;
-  border-radius: 7px; cursor: pointer; font-weight: 500;
+  border-radius: var(--radius-sm); cursor: pointer; font-weight: 500;
   border: 1px solid var(--border2);
   background: var(--bg2); color: var(--text2);
-  transition: all .12s;
+  transition: all .12s; white-space: nowrap;
 }
-.btn:hover { background: var(--bg3); color: var(--text); }
+.btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
 .btn:active { transform: scale(.98); }
 .btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
-.btn-primary:hover { filter: brightness(.9); }
+.btn-primary:hover { background: #1544e0; border-color: #1544e0; color: #fff; }
 .btn-green { background: var(--green); border-color: var(--green); color: #fff; }
-.btn-green:hover { filter: brightness(.9); }
+.btn-green:hover { filter: brightness(.92); }
 .btn-sm { padding: 5px 10px; font-size: 11px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Cards */
 .card {
   background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 10px; overflow: hidden;
+  border-radius: 12px; overflow: hidden; box-shadow: var(--shadow);
 }
 .card-hd {
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg2);
 }
 .card-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; }
-.card-body { padding: 14px 16px; }
+.card-body { padding: 16px 18px; }
 
 /* Badges */
 .badge {
   display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
+  padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  letter-spacing: .1px;
 }
-.badge-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
-.badge-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
-.badge-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+.badge-blue   { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-border);   }
+.badge-green  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-border);  }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber);  border: 1px solid var(--amber-border);  }
+.badge-red    { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-border);    }
 .badge-purple { background: var(--purple-bg); color: var(--purple); border: 1px solid var(--purple-border); }
-.badge-gray { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+.badge-gray   { background: var(--gray-bg);   color: var(--gray);   border: 1px solid var(--gray-border);   }
 
 /* Grid */
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* Metric */
-.metric { background: var(--bg3); border-radius: 8px; padding: 12px 14px; border: 1px solid var(--border); }
-.metric-label { font-size: 11px; color: var(--text3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
-.metric-value { font-size: 22px; font-weight: 600; line-height: 1; }
-.metric-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
+.metric {
+  background: var(--bg2); border-radius: 10px; padding: 14px 16px;
+  border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.metric-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; font-weight: 500; letter-spacing: .3px; }
+.metric-value { font-size: 24px; font-weight: 700; line-height: 1; letter-spacing: -.5px; }
+.metric-sub { font-size: 11px; color: var(--text3); margin-top: 5px; font-family: var(--font-mono); }
 
 /* Upload zone */
-.upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
 .upload-zone {
-  border: 1.5px dashed var(--border2); border-radius: 8px;
-  padding: 14px 10px; text-align: center; cursor: pointer;
+  border: 1.5px dashed var(--border2); border-radius: 10px;
+  padding: 16px 12px; text-align: center; cursor: pointer;
   transition: all .15s; position: relative; overflow: hidden;
   background: var(--bg2);
 }
@@ -179,10 +197,10 @@ body {
 .upload-zone.done { border-style: solid; border-color: var(--green-border); background: var(--green-bg); }
 .upload-zone.done:hover { border-color: var(--green); }
 .upload-zone.missing { border-color: var(--border); background: var(--bg3); opacity: .6; }
-.uz-icon { font-size: 20px; margin-bottom: 5px; }
-.uz-name { font-size: 11px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.uz-icon { font-size: 22px; margin-bottom: 6px; }
+.uz-name { font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .uz-sub { font-size: 10px; color: var(--text3); }
-.uz-check { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.uz-check { position: absolute; top: 7px; right: 7px; width: 17px; height: 17px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 input[type=file] { display: none; }
 
 /* Alert */
@@ -191,7 +209,7 @@ input[type=file] { display: none; }
   display: flex; align-items: flex-start; gap: 10px; font-size: 12px;
 }
 .alert-amber { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber); }
-.alert-blue { background: var(--blue-bg); border: 1px solid var(--blue-border); color: var(--blue); }
+.alert-blue  { background: var(--blue-bg);  border: 1px solid var(--blue-border);  color: var(--blue);  }
 .alert-green { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
 .alert-icon { flex-shrink: 0; margin-top: 1px; }
 
@@ -202,27 +220,27 @@ input[type=file] { display: none; }
   font-size: 12px; table-layout: fixed;
 }
 .tbl th {
-  padding: 8px 10px; text-align: left;
-  font-size: 10px; color: var(--text3); font-weight: 500;
-  letter-spacing: .5px; text-transform: uppercase;
+  padding: 9px 12px; text-align: left;
+  font-size: 10px; color: var(--text3); font-weight: 600;
+  letter-spacing: .6px; text-transform: uppercase;
   border-bottom: 1px solid var(--border);
-  background: var(--bg3); white-space: nowrap;
+  background: var(--bg); white-space: nowrap;
 }
 .tbl td {
-  padding: 9px 10px; border-bottom: 1px solid var(--border);
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
   color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tbl tr:last-child td { border-bottom: none; }
-.tbl tr:hover td { background: var(--bg3); }
+.tbl tr:hover td { background: #fafaf8; }
 .tbl .right { text-align: right; }
 .tbl .muted { color: var(--text3); font-size: 11px; }
-.tbl .mono { font-family: 'IBM Plex Mono', monospace; }
-.tbl input[type=checkbox] { accent-color: var(--blue); width: 13px; height: 13px; cursor: pointer; }
+.tbl .mono { font-family: var(--font-mono); }
+.tbl input[type=checkbox] { accent-color: var(--blue); width: 14px; height: 14px; cursor: pointer; }
 
 /* Footer bar */
 .footer-bar {
-  padding: 10px 16px; border-top: 1px solid var(--border);
-  background: var(--bg3); display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px; border-top: 1px solid var(--border);
+  background: var(--bg); display: flex; align-items: center; justify-content: space-between;
 }
 
 /* Progress steps */
@@ -899,18 +917,19 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, flashCare:0, boxShield:0, total:0 };
+    const key = `${acc}|${rowDateNorm}`; // แยก key ตามวันที่ → 2 วัน = 2 บิล
+    if (!grouped[key]) grouped[key] = { acc, name, carrier, billDate: rowDateNorm, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, flashCare:0, boxShield:0, total:0 };
     const f = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-    grouped[acc].trackingCount += 1;
-    grouped[acc].freight   += f(row[freightCol]);
-    grouped[acc].cod       += f(row[codCol]);
-    grouped[acc].happy     += f(row[happyCol]);
-    grouped[acc].remote    += f(row[remoteCol]);
-    grouped[acc].tourist   += f(row[touristCol]);
-    grouped[acc].pkg       += f(row[pkgCol]);
-    grouped[acc].flashCare += f(row[flashCareCol]);
-    grouped[acc].boxShield += f(row[boxShieldCol]);
-    grouped[acc].total     += f(row[totalVatCol]);
+    grouped[key].trackingCount += 1;
+    grouped[key].freight   += f(row[freightCol]);
+    grouped[key].cod       += f(row[codCol]);
+    grouped[key].happy     += f(row[happyCol]);
+    grouped[key].remote    += f(row[remoteCol]);
+    grouped[key].tourist   += f(row[touristCol]);
+    grouped[key].pkg       += f(row[pkgCol]);
+    grouped[key].flashCare += f(row[flashCareCol]);
+    grouped[key].boxShield += f(row[boxShieldCol]);
+    grouped[key].total     += f(row[totalVatCol]);
   }
   // คำนวณ VAT สำหรับ COD, Flash Care, Box Shield
   Object.values(grouped).forEach(b => {
@@ -998,15 +1017,16 @@ function parseDHLDaily(sheets, targetDates) {
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'DHL', trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, paperPod:0, insurance:0, amDeliv:0, total:0 };
+    const key = `${acc}|${rowDateNorm}`; // แยกตามวัน
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'DHL', billDate: rowDateNorm, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, paperPod:0, insurance:0, amDeliv:0, total:0 };
     const f = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-    grouped[acc].trackingCount += 1;
-    grouped[acc].freight   += f(row[freightCol]);
-    grouped[acc].cod       += f(row[codCol]);
-    grouped[acc].remote    += f(row[remoteCol]);
-    grouped[acc].paperPod  += f(row[paperPodCol]);
-    grouped[acc].insurance += f(row[insuranceCol]);
-    grouped[acc].amDeliv   += f(row[amDelivCol]);
+    grouped[key].trackingCount += 1;
+    grouped[key].freight   += f(row[freightCol]);
+    grouped[key].cod       += f(row[codCol]);
+    grouped[key].remote    += f(row[remoteCol]);
+    grouped[key].paperPod  += f(row[paperPodCol]);
+    grouped[key].insurance += f(row[insuranceCol]);
+    grouped[key].amDeliv   += f(row[amDelivCol]);
   }
   // คำนวณ total เอง (ไม่ใช้ formula col เพราะ XLSX.js อ่านได้แค่ string)
   // VAT applies to: cod, insurance, paperPod, amDeliv
@@ -1058,12 +1078,13 @@ function parseWefastDaily(sheets, targetDates) {
     const acc  = String(row[accCol] || '').trim();
     if (!WF_ACCOUNTS[acc]) continue;
     const name = String(row[nameCol] || acc).trim();
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'WefastD', freight:0, cod:0, insurance:0, boxShield:0, happy:0, remote:0, tourist:0, pkg:0, total:0, overrideType: WF_ACCOUNTS[acc] };
-    grouped[acc].freight   += parseFloat(row[priceCol])     || 0;
-    grouped[acc].total     += parseFloat(row[totalCol])     || 0;
-    grouped[acc].cod       += parseFloat(row[codCol])       || 0;
-    grouped[acc].insurance += parseFloat(row[insuranceCol]) || 0;
-    grouped[acc].boxShield += parseFloat(row[boxShieldCol]) || 0;
+    const key = `${acc}|${rowDate}`; // แยกตามวัน
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, freight:0, cod:0, insurance:0, boxShield:0, happy:0, remote:0, tourist:0, pkg:0, total:0, overrideType: WF_ACCOUNTS[acc] };
+    grouped[key].freight   += parseFloat(row[priceCol])     || 0;
+    grouped[key].total     += parseFloat(row[totalCol])     || 0;
+    grouped[key].cod       += parseFloat(row[codCol])       || 0;
+    grouped[key].insurance += parseFloat(row[insuranceCol]) || 0;
+    grouped[key].boxShield += parseFloat(row[boxShieldCol]) || 0;
   }
   // VAT สำหรับ ประกันสินค้า และ Box Shield
   Object.values(grouped).forEach(b => {
@@ -1096,11 +1117,12 @@ function parseSPXDaily(sheets, targetDates) {
     const acc  = String(row[accCol] || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'SPX', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
-    grouped[acc].freight += parseFloat(row[freightCol]) || 0;
-    grouped[acc].cod     += parseFloat(row[codCol])     || 0;
-    grouped[acc].remote  += parseFloat(row[remoteCol])  || 0;
-    grouped[acc].total   += parseFloat(row[totalCol])   || 0;
+    const key = `${acc}|${rowDate}`; // แยกตามวัน
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    grouped[key].freight += parseFloat(row[freightCol]) || 0;
+    grouped[key].cod     += parseFloat(row[codCol])     || 0;
+    grouped[key].remote  += parseFloat(row[remoteCol])  || 0;
+    grouped[key].total   += parseFloat(row[totalCol])   || 0;
   }
   return Object.values(grouped).filter(b => b.total > 0);
 }
@@ -1216,6 +1238,7 @@ function calculateBills() {
       flowName:      getFlowName(b.acc),
       carrier:       b.carrier,
       type:          custType || 'เงินสด',
+      billDate:      b.billDate || targetDates[0], // วันที่ของ row นี้จริงๆ
       trackingCount: b.trackingCount || 0,
       freight:       b.freight    || 0,
       cod:           b.cod        || 0,
@@ -1229,7 +1252,9 @@ function calculateBills() {
       insurance:     b.insurance  || 0,
       amDeliv:       b.amDeliv    || 0,
       total:         b.total,
-      dateRange:     getDateRange(),
+      dateRange:     b.billDate
+        ? new Date(b.billDate).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'})
+        : getDateRange(),
       noReceipt:     custType === 'ไม่ต้องปิดใบเสร็จ',
       isGroup:       !!groupName,
       groupKey,
@@ -1757,9 +1782,8 @@ async function confirmBills() {
     carrier:       b.carrier,
     type:          b.type,
     dateRange:     b.dateRange,
-    billDate:      selDate,
+    billDate:      b.billDate || selDate, // วันที่จริงของ bill นั้น (ไม่ใช่วันที่ส่วน UI)
     trackingCount: b.trackingCount || 0,
-    freight:       parseFloat(b.freight)   || 0,
     cod:           parseFloat(b.cod)       || 0,
     happy:         parseFloat(b.happy)     || 0,
     remote:        parseFloat(b.remote)    || 0,
@@ -1789,14 +1813,14 @@ async function confirmBills() {
         const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill }));
         const resp = await fetch(GAS_URL + '?data=' + payload);
         const r    = await resp.json();
-        results.push({ subAcc: bill.subAcc, ok: r.ok, invNo: r.invNo, error: r.error });
+        results.push({ subAcc: bill.subAcc, billDate: bill.billDate, ok: r.ok, invNo: r.invNo, error: r.error });
         // อัปเดต progress
         const progMsg = document.createElement('div');
         progMsg.className = 'log-line';
         progMsg.innerHTML = `<span style="font-size:11px;color:${r.ok?'var(--green)':'var(--red)'}">${r.ok?'✓':'✗'} ${bill.name}: ${r.ok?r.invNo:r.error}</span>`;
         document.querySelector('.log-panel')?.appendChild(progMsg);
       } catch(e) {
-        results.push({ subAcc: bill.subAcc, ok: false, error: e.message });
+        results.push({ subAcc: bill.subAcc, billDate: bill.billDate, ok: false, error: e.message });
       }
     }
     const data = { ok: true, results };
@@ -1817,10 +1841,12 @@ async function confirmBills() {
 
     alert(msg);
 
-    // อัปเดต state - ลบรายการที่เปิดไปแล้ว
-    const doneIds = new Set(results.filter(r=>r.ok).map(r=>r.subAcc));
-    state.bills = state.bills.filter(b => !doneIds.has(b.subAcc));
-    state.selectedBills = new Set(state.bills.map(b=>b.id));
+    // อัปเดต state - ลบเฉพาะรายการที่เปิดไปแล้ว (match ทั้ง subAcc + billDate)
+    const doneKeys = new Set(
+      results.filter(r => r.ok).map(r => `${r.subAcc}|${r.billDate}`)
+    );
+    state.bills = state.bills.filter(b => !doneKeys.has(`${b.subAcc}|${b.billDate}`));
+    state.selectedBills = new Set(state.bills.map(b => b.id));
     document.getElementById('bill-count').textContent = state.bills.length;
     render();
 
