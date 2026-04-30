@@ -501,6 +501,7 @@ let state = {
   currentPage: 'upload',
   calculating: false,
   customersLoaded: false, // flag รอ loadCustomersFromSheet เสร็จก่อนคำนวณได้
+  typeFilter: '',         // filter ประเภทใน bills page
 };
 
 // ─── Init ─────────────────────────────────────────────────────
@@ -892,7 +893,9 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
     const rowDate = String(row[dateCol] || '').trim();
-    if (!targetDates.some(d => rowDate === d || rowDate.includes(d.replace(/-/g,'/')))) continue;
+    // Flash format: YYYY-MM-DD หรือ YYYY/MM/DD
+    const rowDateNorm = rowDate.slice(0,10).replace(/\//g,'-');
+    if (!rowDateNorm || !targetDates.some(d => rowDateNorm === d || rowDate.includes(d.replace(/-/g,'/')))) continue;
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
@@ -973,13 +976,25 @@ function parseDHLDaily(sheets, targetDates) {
 
   if (dateCol < 0 || accCol < 0) return [];
 
+  // helper: แปลง date value ทุก format → YYYY-MM-DD
+  function normDHLDate(v) {
+    if (!v) return '';
+    const s = String(v).trim();
+    // ISO: 2026-04-28
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+    // DD.MM.YYYY หรือ DD-MM-YYYY
+    const m = s.match(/^(\d{1,2})[.\-](\d{1,2})[.\-](\d{4})/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    // Date object จาก XLSX (serial number แปลงแล้ว)
+    return s.slice(0,10);
+  }
+
   const VAT_RATE = 0.07;
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
-    const rowDate = String(row[dateCol] || '').trim().replace(/\./g,'-');
-    const rowDateNorm = rowDate.split('-').reverse().join('-');
-    if (!targetDates.some(d => rowDateNorm === d || rowDate.includes(d.split('-').reverse().join('.')))) continue;
+    const rowDateNorm = normDHLDate(row[dateCol]);
+    if (!rowDateNorm || !targetDates.includes(rowDateNorm)) continue;
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
@@ -1099,6 +1114,7 @@ function calculateBills() {
   }
   const targetDates = getSelectedDates();
   if (!targetDates) { alert('กรุณาเลือกวันที่ก่อนครับ'); return; }
+  state.typeFilter = ''; // reset filter เมื่อคำนวณใหม่
 
   const now     = new Date(targetDates[0]);
   const today   = now.getDay();
@@ -1313,14 +1329,17 @@ function renderBills() {
 
   const now   = new Date();
   const day   = DAYS_TH[now.getDay()];
-  const types = [...new Set(state.bills.map(b => b.type))];
-  const total = state.bills.filter(b => state.selectedBills.has(b.id)).reduce((s,b) => s+b.total, 0);
+  const types = [...new Set(state.bills.map(b => b.type))].sort();
+  const activeBills = state.typeFilter
+    ? state.bills.filter(b => b.type === state.typeFilter)
+    : state.bills;
+  const total = activeBills.filter(b => state.selectedBills.has(b.id)).reduce((s,b) => s+b.total, 0);
 
-  const typeFilter = types.map(t =>
-    `<option value="${t}">${t}</option>`
+  const typeOptions = ['', ...types].map(t =>
+    `<option value="${t}" ${state.typeFilter===t?'selected':''}>${t||'ทุกประเภท'}</option>`
   ).join('');
 
-  const rows = state.bills.map(b => {
+  const rows = activeBills.map(b => {
     const checked = state.selectedBills.has(b.id);
     const typeBadge =
       b.type === 'Credit7D'  ? 'badge-blue' :
@@ -1352,12 +1371,12 @@ function renderBills() {
     </tr>`;
   }).join('');
 
-  const selCount = state.selectedBills.size;
+  const selCount = activeBills.filter(b => state.selectedBills.has(b.id)).length;
 
   return `
   <div class="grid-4">
     <div class="metric"><div class="metric-label">รายการทั้งหมด</div><div class="metric-value" style="color:var(--blue)">${state.bills.length}</div><div class="metric-sub">วัน${day}นี้</div></div>
-    <div class="metric"><div class="metric-label">เลือกแล้ว</div><div class="metric-value" style="color:var(--green)">${selCount}</div><div class="metric-sub">รายการ</div></div>
+    <div class="metric"><div class="metric-label">แสดงอยู่</div><div class="metric-value" style="color:var(--green)">${activeBills.length}</div><div class="metric-sub">${state.typeFilter||'ทุกประเภท'}</div></div>
     <div class="metric"><div class="metric-label">ยอดรวมที่เลือก</div><div class="metric-value" style="color:var(--text);font-size:16px">฿${total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="metric-sub">รวม VAT</div></div>
     <div class="metric"><div class="metric-label">กลุ่มพิเศษ</div><div class="metric-value" style="color:var(--purple)">${state.bills.filter(b=>b.isGroup).length}</div><div class="metric-sub">Kiss/Kety</div></div>
   </div>
@@ -1365,10 +1384,10 @@ function renderBills() {
   <div class="card">
     <div class="card-hd">
       <div class="card-title">รายการที่ต้องเปิดบิลวันนี้</div>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text3)">กรองประเภท:</span>
         <select style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2)" onchange="filterByType(this.value)">
-          <option value="">ทุกประเภท</option>
-          ${typeFilter}
+          ${typeOptions}
         </select>
         <button class="btn btn-sm" onclick="selectAll(true)">เลือกทั้งหมด</button>
         <button class="btn btn-sm" onclick="selectAll(false)">ยกเลิก</button>
@@ -1400,7 +1419,8 @@ function renderBills() {
     </div>
     <div class="footer-bar">
       <div style="font-size:12px;color:var(--text2)">
-        เลือก <strong>${selCount}</strong> รายการ · รวม <strong>฿${total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong>
+        เลือก <strong>${selCount}</strong> จาก <strong>${activeBills.length}</strong> รายการ · รวม <strong>฿${total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong>
+        ${state.typeFilter ? `<span class="badge badge-blue" style="font-size:10px;margin-left:6px">${state.typeFilter}</span>` : ''}
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="exportExcel()">Export Excel ↓</button>
@@ -1662,15 +1682,19 @@ function toggleBill(id, checked) {
 }
 
 function selectAll(checked) {
-  if (checked) state.bills.forEach(b => state.selectedBills.add(b.id));
-  else         state.selectedBills.clear();
+  const activeBills = state.typeFilter
+    ? state.bills.filter(b => b.type === state.typeFilter)
+    : state.bills;
+  if (checked) activeBills.forEach(b => state.selectedBills.add(b.id));
+  else         activeBills.forEach(b => state.selectedBills.delete(b.id));
   render();
-  // sync header checkbox
   const hdr = document.getElementById('check-all');
   if (hdr) hdr.checked = checked;
 }
 
 function filterByType(type) {
+  state.typeFilter = type || '';
+  // auto-select ตาม filter ที่เลือก
   if (!type) {
     state.bills.forEach(b => state.selectedBills.add(b.id));
   } else {
