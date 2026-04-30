@@ -1516,6 +1516,8 @@ async function syncFlowaccount(btn) {
     setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 3000);
   }
 }
+
+async function markPaid(blNo, carrier) {
   if (!blNo || blNo === '-') { alert('ไม่มี BL No.'); return; }
   const paidDate   = prompt('วันที่ชำระ (dd/mm/yyyy):', new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}));
   if (!paidDate) return;
