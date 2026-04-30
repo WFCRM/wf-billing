@@ -871,20 +871,23 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   const rows = sheets[sname];
   if (!rows || rows.length < 2) return [];
   const headers = rows[0];
-  const dateCol    = headers.findIndex(h => String(h).trim() === 'Date');
-  const accCol     = headers.findIndex(h => String(h).includes('Operated by') || String(h) === 'Operated by');
-  const nameCol    = headers.findIndex(h => String(h).includes('Sub-account Name'));
-  const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
-  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
-  const happyCol   = headers.findIndex(h => String(h).includes('Happy Return'));
-  const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
-  const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat') || String(h).includes('Total+Vat'));
-  const touristCol = headers.findIndex(h => String(h).includes('พื้นที่ท่องเที่ยว'));
-  const pkgCol     = headers.findIndex(h => String(h).includes('Packaging'));
+  const dateCol      = headers.findIndex(h => String(h).trim() === 'Date');
+  const accCol       = headers.findIndex(h => String(h).includes('Operated by') || String(h) === 'Operated by');
+  const nameCol      = headers.findIndex(h => String(h).includes('Sub-account Name'));
+  const freightCol   = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
+  const codCol       = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
+  const happyCol     = headers.findIndex(h => String(h).includes('Happy Return'));
+  const remoteCol    = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
+  const totalVatCol  = headers.findIndex(h => String(h).includes('Total รวม Vat') || String(h).includes('Total+Vat'));
+  const touristCol   = headers.findIndex(h => String(h).includes('พื้นที่ท่องเที่ยว'));
+  const pkgCol       = headers.findIndex(h => String(h).includes('Packaging'));
+  // Flash Care และ Box Shield (มี VAT)
+  const flashCareCol = headers.findIndex(h => /flash\s*care/i.test(String(h)));
+  const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)));
 
   if (dateCol < 0 || accCol < 0) return parseFlashPivot(sheets, carrier);
 
-  // filter rows ตามวันที่
+  const VAT_RATE = 0.07;
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
@@ -893,15 +896,23 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
-    grouped[acc].freight += parseFloat(row[freightCol]) || 0;
-    grouped[acc].cod     += parseFloat(row[codCol])     || 0;
-    grouped[acc].happy   += parseFloat(row[happyCol])   || 0;
-    grouped[acc].remote  += parseFloat(row[remoteCol])  || 0;
-    grouped[acc].tourist += parseFloat(row[touristCol]) || 0;
-    grouped[acc].pkg     += parseFloat(row[pkgCol])     || 0;
-    grouped[acc].total   += parseFloat(row[totalVatCol])|| 0;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, flashCare:0, boxShield:0, total:0 };
+    grouped[acc].freight   += parseFloat(row[freightCol])   || 0;
+    grouped[acc].cod       += parseFloat(row[codCol])       || 0;
+    grouped[acc].happy     += parseFloat(row[happyCol])     || 0;
+    grouped[acc].remote    += parseFloat(row[remoteCol])    || 0;
+    grouped[acc].tourist   += parseFloat(row[touristCol])   || 0;
+    grouped[acc].pkg       += parseFloat(row[pkgCol])       || 0;
+    grouped[acc].flashCare += parseFloat(row[flashCareCol]) || 0;
+    grouped[acc].boxShield += parseFloat(row[boxShieldCol]) || 0;
+    grouped[acc].total     += parseFloat(row[totalVatCol])  || 0;
   }
+  // คำนวณ VAT สำหรับ COD, Flash Care, Box Shield
+  Object.values(grouped).forEach(b => {
+    b.codVat       = b.cod       > 0 ? parseFloat((b.cod       * VAT_RATE).toFixed(2)) : 0;
+    b.flashCareVat = b.flashCare > 0 ? parseFloat((b.flashCare * VAT_RATE).toFixed(2)) : 0;
+    b.boxShieldVat = b.boxShield > 0 ? parseFloat((b.boxShield * VAT_RATE).toFixed(2)) : 0;
+  });
   return Object.values(grouped).filter(b => b.total > 0);
 }
 
@@ -941,62 +952,98 @@ function parseDHLDaily(sheets, targetDates) {
   const rows = sheets[sname];
   if (!rows || rows.length < 2) return [];
   const headers = rows[0];
-  const dateCol    = headers.findIndex(h => String(h).includes('Pick up date'));
-  const accCol     = headers.findIndex(h => String(h).includes('Pick Up Account') && !String(h).includes('Name'));
-  const nameCol    = headers.findIndex(h => String(h).includes('Pick Up Account Name') || String(h).includes('Customer Name'));
-  const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
-  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
-  const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
-  const totalVatCol= headers.findIndex(h => String(h).includes('Total รวม Vat'));
+  const dateCol      = headers.findIndex(h => String(h).includes('Pick up date'));
+  const accCol       = headers.findIndex(h => String(h).includes('Pick Up Account') && !String(h).includes('Name'));
+  const nameCol      = headers.findIndex(h => String(h).includes('Pick Up Account Name') || String(h).includes('Customer Name'));
+  const freightCol   = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
+  const codCol       = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
+  const remoteCol    = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
+  const totalVatCol  = headers.findIndex(h => String(h).includes('Total รวม Vat'));
+  // รายการเพิ่มเติม DHL (มี VAT)
+  const paperPodCol  = headers.findIndex(h => /paper\s*pod/i.test(String(h)));
+  const insuranceCol = headers.findIndex(h => String(h).includes('ประกันสินค้า') || /insurance/i.test(String(h)));
+  const amDelivCol   = headers.findIndex(h => /am\s*delivery/i.test(String(h)));
+
   if (dateCol < 0 || accCol < 0) return [];
 
+  const VAT_RATE = 0.07;
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
     const rowDate = String(row[dateCol] || '').trim().replace(/\./g,'-');
-    // DHL format: 27.04.2026 → compare with 2026-04-27
     const rowDateNorm = rowDate.split('-').reverse().join('-');
     if (!targetDates.some(d => rowDateNorm === d || rowDate.includes(d.split('-').reverse().join('.')))) continue;
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'DHL', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
-    grouped[acc].freight += parseFloat(row[freightCol]) || 0;
-    grouped[acc].cod     += parseFloat(row[codCol])     || 0;
-    grouped[acc].remote  += parseFloat(row[remoteCol])  || 0;
-    grouped[acc].total   += parseFloat(row[totalVatCol])|| 0;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'DHL', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, paperPod:0, insurance:0, amDeliv:0, total:0 };
+    grouped[acc].freight   += parseFloat(row[freightCol])   || 0;
+    grouped[acc].cod       += parseFloat(row[codCol])       || 0;
+    grouped[acc].remote    += parseFloat(row[remoteCol])    || 0;
+    grouped[acc].paperPod  += parseFloat(row[paperPodCol])  || 0;
+    grouped[acc].insurance += parseFloat(row[insuranceCol]) || 0;
+    grouped[acc].amDeliv   += parseFloat(row[amDelivCol])   || 0;
+    grouped[acc].total     += parseFloat(row[totalVatCol])  || 0;
   }
+  // คำนวณ VAT สำหรับรายการที่มี VAT
+  Object.values(grouped).forEach(b => {
+    b.codVat       = b.cod       > 0 ? parseFloat((b.cod       * VAT_RATE).toFixed(2)) : 0;
+    b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
+    b.paperPodVat  = b.paperPod  > 0 ? parseFloat((b.paperPod  * VAT_RATE).toFixed(2)) : 0;
+    b.amDelivVat   = b.amDeliv   > 0 ? parseFloat((b.amDeliv   * VAT_RATE).toFixed(2)) : 0;
+  });
   return Object.values(grouped).filter(b => b.total > 0);
 }
 
 // ─── Parse WefastD ───────────────────────────────────────────
 function parseWefastDaily(sheets, targetDates) {
-  const WF_ACCOUNTS = { 'WF238': 'Credit7D', 'WF1663': 'เงินสด', 'WF1995': 'Credit15D' };
-  const sname = Object.keys(sheets).find(n => n.includes('ข้อมูลรายละเอียด'));
-  if (!sname) return [];
+  // WF_ACCOUNTS: accounts ที่ต้องเปิดบิล (key = account, value = type default)
+  const WF_ACCOUNTS = { 'WF238':'Credit7D', 'WF1663':'เงินสด', 'WF1955':'Credit15D' };
+  // ลองหา sheet ชื่อ "ข้อมูลรายละเอียด" หรือ sheet แรกที่ไม่ใช่ summary
+  const sname = Object.keys(sheets).find(n => n.includes('ข้อมูลรายละเอียด') || n.includes('detail') || n.includes('Daily') || n.includes('รายละเอียด'));
+  if (!sname) {
+    console.log('WefastD: ไม่พบ sheet ข้อมูลรายละเอียด, sheets:', Object.keys(sheets));
+    return [];
+  }
   const rows = sheets[sname];
   if (!rows || rows.length < 2) return [];
   const headers = rows[0];
-  const dateCol  = headers.findIndex(h => String(h).trim() === 'Date');
-  const accCol   = headers.findIndex(h => String(h).trim() === 'Account');
-  const nameCol  = headers.findIndex(h => String(h).trim() === 'Customer name');
-  const priceCol = headers.findIndex(h => String(h).includes('ราคา (บาท)'));
-  const totalCol = headers.findIndex(h => String(h).trim() === 'Grand Total');
-  const codCol   = headers.findIndex(h => String(h).trim().startsWith('เก็บเงิน') || String(h).includes('COD'));
-  if (accCol < 0) return [];
+  console.log('WefastD headers:', headers.slice(0,15));
+  const dateCol      = headers.findIndex(h => /^date$/i.test(String(h).trim()) || String(h).includes('วันที่'));
+  const accCol       = headers.findIndex(h => /^account$/i.test(String(h).trim()) || String(h).includes('Sub Account'));
+  const nameCol      = headers.findIndex(h => /customer\s*name/i.test(String(h)) || String(h).includes('ชื่อลูกค้า'));
+  const priceCol     = headers.findIndex(h => String(h).includes('ราคา (บาท)') || /^price$/i.test(String(h).trim()));
+  const totalCol     = headers.findIndex(h => /grand\s*total/i.test(String(h)) || String(h).includes('ยอดรวม'));
+  const codCol       = headers.findIndex(h => String(h).trim().startsWith('เก็บเงิน') || /^cod$/i.test(String(h).trim()));
+  const insuranceCol = headers.findIndex(h => String(h).includes('ประกันสินค้า') || /insurance/i.test(String(h)));
+  const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)) || String(h).includes('ประกันกล่อง'));
+
+  if (accCol < 0) {
+    console.log('WefastD: ไม่พบ column Account');
+    return [];
+  }
+
+  const VAT_RATE = 0.07;
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
     const rowDate = String(row[dateCol] || '').trim().slice(0,10);
-    if (!targetDates.some(d => rowDate === d || rowDate.includes(d))) continue;
+    if (dateCol >= 0 && !targetDates.some(d => rowDate === d || rowDate.includes(d))) continue;
     const acc  = String(row[accCol] || '').trim();
     if (!WF_ACCOUNTS[acc]) continue;
     const name = String(row[nameCol] || acc).trim();
-    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'WefastD', freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0, overrideType: WF_ACCOUNTS[acc] };
-    grouped[acc].freight += parseFloat(row[priceCol]) || 0;
-    grouped[acc].total   += parseFloat(row[totalCol]) || 0;
-    grouped[acc].cod     += parseFloat(row[codCol])   || 0;
+    if (!grouped[acc]) grouped[acc] = { acc, name, carrier:'WefastD', freight:0, cod:0, insurance:0, boxShield:0, happy:0, remote:0, tourist:0, pkg:0, total:0, overrideType: WF_ACCOUNTS[acc] };
+    grouped[acc].freight   += parseFloat(row[priceCol])     || 0;
+    grouped[acc].total     += parseFloat(row[totalCol])     || 0;
+    grouped[acc].cod       += parseFloat(row[codCol])       || 0;
+    grouped[acc].insurance += parseFloat(row[insuranceCol]) || 0;
+    grouped[acc].boxShield += parseFloat(row[boxShieldCol]) || 0;
   }
+  // VAT สำหรับ ประกันสินค้า และ Box Shield
+  Object.values(grouped).forEach(b => {
+    b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
+    b.boxShieldVat = b.boxShield > 0 ? parseFloat((b.boxShield * VAT_RATE).toFixed(2)) : 0;
+  });
   return Object.values(grouped).filter(b => b.total > 0);
 }
 
@@ -1218,16 +1265,23 @@ function calculateBills() {
 
 function buildLineItems(b) {
   const items = [];
-  if (b.freight  > 0) items.push({ label:'ค่าขนส่ง (Freight)',      amount: b.freight  });
-  if (b.cod      > 0) items.push({ label:'COD',                      amount: b.cod      });
-  if (b.happy    > 0) items.push({ label:'Happy Return',             amount: b.happy    });
-  if (b.remote   > 0) items.push({ label:'พื้นที่ห่างไกล',           amount: b.remote   });
-  if (b.tourist  > 0) items.push({ label:'พื้นที่ท่องเที่ยว',         amount: b.tourist  });
-  if (b.pkg      > 0) items.push({ label:'Packaging Fee',            amount: b.pkg      });
+  if ((b.freight   || 0) > 0) items.push({ label:'ค่าขนส่ง (Freight)',            amount: b.freight,   vat: false });
+  if ((b.cod       || 0) > 0) items.push({ label:'ค่าธรรมเนียม COD',               amount: b.cod,       vat: true  });
+  if ((b.happy     || 0) > 0) items.push({ label:'Happy Return',                   amount: b.happy,     vat: false });
+  if ((b.remote    || 0) > 0) items.push({ label:'ค่าพื้นที่ห่างไกล',              amount: b.remote,    vat: false });
+  if ((b.tourist   || 0) > 0) items.push({ label:'ค่าพื้นที่ท่องเที่ยว',            amount: b.tourist,   vat: false });
+  if ((b.pkg       || 0) > 0) items.push({ label:'Packaging Fee',                  amount: b.pkg,       vat: false });
+  // Flash
+  if ((b.flashCare || 0) > 0) items.push({ label:'Flash Care',                     amount: b.flashCare, vat: true  });
+  if ((b.boxShield || 0) > 0) items.push({ label:'Box Shield',                     amount: b.boxShield, vat: true  });
+  // DHL
+  if ((b.paperPod  || 0) > 0) items.push({ label:'Paper POD Fee',                  amount: b.paperPod,  vat: true  });
+  if ((b.insurance || 0) > 0) items.push({ label:'ค่าประกันสินค้า',                amount: b.insurance, vat: true  });
+  if ((b.amDeliv   || 0) > 0) items.push({ label:'AM Delivery',                    amount: b.amDeliv,   vat: true  });
   return items;
 }
 function buildLineItemsFromBill(b) {
-  return buildLineItems({ freight:b.freight, cod:b.cod, happy:b.happy, remote:b.remote, tourist:b.tourist, pkg:b.pkg });
+  return buildLineItems(b);
 }
 
 // ─── Bills page ───────────────────────────────────────────────
@@ -1363,18 +1417,23 @@ async function renderTracking() {
       : rows.map(r => {
           const isPending = r['สถานะ'] === 'รอชำระ';
           const isOverdue = isPending && r['วันครบกำหนด'] && isOverdueDate(r['วันครบกำหนด']);
+          const blNo  = r['BL No. (Flowaccount)'] || r['INV No. (Flowaccount)'] || '-';
+          const invNo = r['Inv No. (ใบกำกับ)'] || '';
           return `<tr>
             <td><div style="font-weight:500;font-size:12px">${r['ชื่อลูกค้า (Flowaccount)']}</div>
                 <div style="font-size:10px;color:var(--text3)">${r['Sub Account']}</div></td>
             <td><span class="badge badge-${r['Carrier']==='Flash'?'blue':r['Carrier']==='DHL'?'gray':r['Carrier']==='WefastD'?'purple':'amber'}" style="font-size:10px">${r['Carrier']}</span></td>
             <td style="font-size:11px;color:var(--text2)">${r['รอบวันที่']}</td>
             <td style="text-align:right;font-weight:500">฿${parseFloat(r['ยอดรวม VAT']||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
-            <td style="font-size:11px;font-family:var(--font-mono)">${r['INV No. (Flowaccount)']||'-'}</td>
+            <td style="font-size:11px;font-family:var(--font-mono)">
+              <div>${blNo}</div>
+              ${invNo ? `<div style="font-size:10px;color:var(--green)">INV: ${invNo}</div>` : ''}
+            </td>
             <td style="font-size:11px;color:${isOverdue?'var(--red)':'var(--text2)'}">${r['วันครบกำหนด']||'-'}</td>
             <td>${r['วันที่ชำระ']||'-'}</td>
             <td><span class="badge ${isPending?(isOverdue?'badge-red':'badge-amber'):'badge-green'}" style="font-size:10px">
               ${isPending?(isOverdue?'เกินกำหนด':'รอชำระ'):'ชำระแล้ว'}</span></td>
-            <td>${isPending?`<button class="btn btn-sm" style="font-size:10px" onclick="markPaid('${r['INV No. (Flowaccount)']}','${carrier}')">บันทึกชำระ</button>`:''}</td>
+            <td>${isPending?`<button class="btn btn-sm" style="font-size:10px" onclick="markPaid('${blNo}','${carrier}')">บันทึกชำระ</button>`:''}</td>
           </tr>`;
         }).join('');
 
@@ -1388,10 +1447,10 @@ async function renderTracking() {
       <div style="border-bottom:1px solid var(--border);display:flex;padding:0 16px">${tabs}</div>
       <div class="tbl-wrap">
         <table class="tbl">
-          <colgroup><col style="width:180px"><col style="width:70px"><col style="width:100px"><col style="width:90px"><col style="width:120px"><col style="width:90px"><col style="width:90px"><col style="width:80px"><col style="width:90px"></colgroup>
+          <colgroup><col style="width:180px"><col style="width:70px"><col style="width:100px"><col style="width:90px"><col style="width:130px"><col style="width:90px"><col style="width:90px"><col style="width:80px"><col style="width:90px"></colgroup>
           <thead><tr>
             <th>ลูกค้า</th><th>Carrier</th><th>รอบวันที่</th>
-            <th class="right">ยอด VAT</th><th>INV No.</th>
+            <th class="right">ยอด VAT</th><th>BL No. / INV No.</th>
             <th>ครบกำหนด</th><th>วันชำระ</th><th>สถานะ</th><th></th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
@@ -1411,20 +1470,28 @@ function isOverdueDate(dateStr) {
   return d < new Date();
 }
 
-async function markPaid(invNo, carrier) {
-  if (!invNo || invNo === '-') { alert('ไม่มี INV No.'); return; }
+async function markPaid(blNo, carrier) {
+  if (!blNo || blNo === '-') { alert('ไม่มี BL No.'); return; }
   const paidDate   = prompt('วันที่ชำระ (dd/mm/yyyy):', new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}));
   if (!paidDate) return;
   const paidAmount = prompt('ยอดที่ชำระ:');
   if (!paidAmount) return;
-  const wht = prompt('หัก ณ ที่จ่าย (ถ้ามี ใส่ 0 ถ้าไม่มี):', '0');
+  const wht    = prompt('หัก ณ ที่จ่าย (ใส่ 0 ถ้าไม่มี):', '0');
+  const invNo2 = prompt('Inv No. (เลขใบกำกับ/ใบเสร็จจาก Flowaccount — ถ้าไม่มีกด OK ข้ามได้):', '') || '';
 
   try {
-    const payload2 = encodeURIComponent(JSON.stringify({ action: 'updatePayment', invNo, carrier, paidDate, paidAmount: parseFloat(paidAmount), wht: parseFloat(wht||0) }));
+    const payload2 = encodeURIComponent(JSON.stringify({
+      action: 'updatePayment',
+      invNo:  blNo,     // BL No. ใช้ค้นหาแถว
+      invNo2: invNo2,   // Inv No. บันทึกลง col K
+      carrier, paidDate,
+      paidAmount: parseFloat(paidAmount),
+      wht: parseFloat(wht||0)
+    }));
     const resp = await fetch(GAS_URL + '?data=' + payload2);
     const data = await resp.json();
     if (!data.ok) throw new Error(data.error);
-    alert('บันทึกการชำระสำเร็จ!');
+    alert('✅ บันทึกการชำระสำเร็จ!');
     renderTracking();
   } catch(err) {
     alert('เกิดข้อผิดพลาด: ' + err.message);
@@ -1491,11 +1558,27 @@ async function confirmBills() {
   const total    = selected.reduce((s,b) => s+b.total, 0);
   const totalFmt = total.toLocaleString('th-TH',{minimumFractionDigits:2});
 
-  if (!confirm(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
-
-  // เตรียม payload พร้อม flowName
   const selDate = document.getElementById('bill-date')?.value;
   if (!selDate) { alert('กรุณาเลือกวันที่รับงานก่อนเปิดบิลครับ'); return; }
+
+  // ─ เช็ค duplicate: ถามก่อนถ้าพบว่าเปิดบิลวันนี้ไปแล้ว ─
+  const dateDisplay = new Date(selDate).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+  try {
+    const dupChecks = await Promise.all(selected.map(async b => {
+      const p = encodeURIComponent(JSON.stringify({ action:'checkDuplicate', subAcc: b.subAcc, carrier: b.carrier, billDate: dateDisplay }));
+      const r = await fetch(GAS_URL + '?data=' + p);
+      const d = await r.json();
+      return { subAcc: b.subAcc, name: b.name, duplicate: d.duplicate, blNo: d.blNo };
+    }));
+    const dups = dupChecks.filter(d => d.duplicate);
+    if (dups.length > 0) {
+      const dupList = dups.map(d => `• ${d.name} (${d.subAcc}) — BL: ${d.blNo||'?'}`).join('\n');
+      const proceed = confirm(`⚠️ พบรายการที่เปิดบิลวันที่ ${dateDisplay} ไปแล้ว:\n\n${dupList}\n\nต้องการเปิดบิลซ้ำหรือไม่?\n(กด OK = เปิดซ้ำ, Cancel = ยกเลิก)`);
+      if (!proceed) return;
+    }
+  } catch(e) { console.log('dup check error:', e); }
+
+  if (!confirm(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
   const bills = selected.map(b => ({
     subAcc:    b.subAcc,
     flowName:  getFlowName(b.subAcc),
@@ -1503,13 +1586,20 @@ async function confirmBills() {
     type:      b.type,
     dateRange: b.dateRange,
     billDate:  selDate,
-    freight:   parseFloat(b.freight)  || 0,
-    cod:       parseFloat(b.cod)      || 0,
-    happy:     parseFloat(b.happy)    || 0,
-    remote:    parseFloat(b.remote)   || 0,
-    tourist:   parseFloat(b.tourist)  || 0,
-    pkg:       parseFloat(b.pkg)      || 0,
-    total:     parseFloat(b.total)    || 0,
+    freight:   parseFloat(b.freight)   || 0,
+    cod:       parseFloat(b.cod)       || 0,
+    happy:     parseFloat(b.happy)     || 0,
+    remote:    parseFloat(b.remote)    || 0,
+    tourist:   parseFloat(b.tourist)   || 0,
+    pkg:       parseFloat(b.pkg)       || 0,
+    // Flash
+    flashCare: parseFloat(b.flashCare) || 0,
+    boxShield: parseFloat(b.boxShield) || 0,
+    // DHL
+    paperPod:  parseFloat(b.paperPod)  || 0,
+    insurance: parseFloat(b.insurance) || 0,
+    amDeliv:   parseFloat(b.amDeliv)   || 0,
+    total:     parseFloat(b.total)     || 0,
     noReceipt: b.noReceipt || false,
   }));
 
