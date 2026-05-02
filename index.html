@@ -709,7 +709,6 @@ function init() {
 }
 
 async function loadCustomersFromSheet() {
-  // แสดงปุ่มคำนวณเป็น loading ก่อน
   const calcBtn = document.getElementById('calc-btn');
   if (calcBtn) {
     calcBtn.disabled = true;
@@ -718,9 +717,8 @@ async function loadCustomersFromSheet() {
   try {
     const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getCustomers' })));
     const data = await resp.json();
-    console.log('GAS getCustomers raw:', JSON.stringify(data).slice(0, 500));
+    console.log('GAS getCustomers raw:', JSON.stringify(data).slice(0, 300));
     if (data.ok && data.customers && Object.keys(data.customers).length > 0) {
-      // ตัดเลขนำหน้าชื่อออก เช่น "13บริษัท..." → "บริษัท..."
       const cleaned = {};
       Object.entries(data.customers).forEach(([acc, v]) => {
         cleaned[acc] = {
@@ -729,25 +727,22 @@ async function loadCustomersFromSheet() {
         };
       });
       state.customerTypes = cleaned;
-      state.customersLoaded = true;
-      console.log('โหลด CustomerTypes จาก Sheet:', Object.keys(cleaned).length, 'accounts');
-      console.log('ตัวอย่าง:', JSON.stringify(Object.entries(cleaned).slice(0,3)));
+      console.log('โหลด CustomerTypes:', Object.keys(cleaned).length, 'accounts');
     } else {
-      // ไม่มีข้อมูลใน Sheet ก็ยังให้ใช้งานได้ (ใช้ค่า default เงินสด)
-      state.customersLoaded = true;
       console.log('CustomerTypes: ไม่มีข้อมูลใน Sheet ใช้ค่า default');
     }
   } catch(e) {
-    // fetch error — ยังให้ใช้งานได้ แต่ type จะเป็นค่า default
-    state.customersLoaded = true;
     console.log('loadCustomers error:', e.message);
   } finally {
-    // คืนปุ่มคำนวณกลับปกติเสมอ
-    if (calcBtn) {
-      calcBtn.disabled = false;
-      calcBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2v8" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg> คำนวณรายการ';
+    // set flag เสมอไม่ว่าจะ success หรือ error
+    state.customersLoaded = true;
+    const btn = document.getElementById('calc-btn');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2v8" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg> คำนวณรายการ';
     }
-    document.getElementById('bill-count').textContent = state.bills.length;
+    const billCount = document.getElementById('bill-count');
+    if (billCount) billCount.textContent = state.bills.length;
   }
 }
 
@@ -953,6 +948,7 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(d2)) return d2;
     return '';
   }
+  const VAT_RATE = 0.07;
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
