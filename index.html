@@ -928,8 +928,8 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   const totalVatCol  = headers.findIndex(h => String(h).includes('Total รวม Vat') || String(h).includes('Total+Vat'));
   const touristCol   = headers.findIndex(h => String(h).includes('พื้นที่ท่องเที่ยว'));
   const pkgCol       = headers.findIndex(h => String(h).includes('Packaging'));
-  const flashCareCol = headers.findIndex(h => /flash\s*care/i.test(String(h)) && !String(h).toLowerCase().includes('flash care flash'));
-  const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)));
+  const flashCareCol = headers.findIndex(h => /flash\s*care/i.test(String(h)) && !/flash\s*care\s*flash/i.test(String(h)));
+  const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)) && !/box\s*shield\s*flash/i.test(String(h)));
 
   if (dateCol < 0 || accCol < 0) return parseFlashPivot(sheets, carrier);
 
@@ -1205,14 +1205,15 @@ function calculateBills() {
     if (!bills || bills.length === 0) return;
     const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
     const payload = bills.map(b => ({
-      subAcc:   b.acc,
-      flowName: getFlowName(b.acc),
-      carrier:  b.carrier,
-      type:     creditType,
-      billDate: b.billDate || selDate,
-      freight:  parseFloat(b.freight) || 0,
-      cod:      parseFloat(b.cod)     || 0,
-      total:    parseFloat(b.total)   || 0,
+      subAcc:        b.acc,
+      flowName:      getFlowName(b.acc),
+      carrier:       b.carrier,
+      type:          creditType,
+      billDate:      b.billDate || selDate,
+      trackingCount: b.trackingCount || 0,
+      freight:       parseFloat(b.freight) || 0,
+      cod:           parseFloat(b.cod)     || 0,
+      total:         parseFloat(b.total)   || 0,
     }));
     const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulateCredit', bills: payload, creditType }));
     const resp = await fetch(GAS_URL + '?data=' + p);
@@ -1361,16 +1362,17 @@ function calculateBills() {
   if (accumulateRaw.length > 0) {
     const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
     const accPayload = accumulateRaw.map(b => ({
-      subAcc:    b.acc,
-      flowName:  getFlowName(b.acc),
-      carrier:   b.carrier,
-      type:      b.type,
-      dateRange: getDateRange(),
-      billDate:  selDate,
-      freight:   parseFloat(b.freight) || 0,
-      cod:       parseFloat(b.cod)     || 0,
-      total:     parseFloat(b.total)   || 0,
-      noReceipt: false,
+      subAcc:        b.acc,
+      flowName:      getFlowName(b.acc),
+      carrier:       b.carrier,
+      type:          b.type,
+      dateRange:     getDateRange(),
+      billDate:      b.billDate || selDate,
+      trackingCount: b.trackingCount || 0,
+      freight:       parseFloat(b.freight) || 0,
+      cod:           parseFloat(b.cod)     || 0,
+      total:         parseFloat(b.total)   || 0,
+      noReceipt:     false,
     }));
     const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulate', bills: accPayload }));
     fetch(GAS_URL + '?data=' + p)
@@ -1571,7 +1573,7 @@ async function renderTracking() {
       : rows.map(r => {
           const isPending = r['สถานะ'] === 'รอชำระ';
           const isOverdue = isPending && r['วันครบกำหนด'] && isOverdueDate(r['วันครบกำหนด']);
-          const blNo  = r['BL No. (Flowaccount)'] || r['INV No. (Flowaccount)'] || '-';
+          const blNo  = r['BL No. (Flowaccount)'] || '-';
           const invNo = r['Inv No. (ใบกำกับ)'] || '';
           return `<tr>
             <td><div style="font-weight:500;font-size:12px">${r['ชื่อลูกค้า (Flowaccount)']}</div>
