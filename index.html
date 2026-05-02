@@ -926,26 +926,38 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   const accCol       = headers.findIndex(h => String(h).includes('Operated by') || String(h) === 'Operated by');
   const nameCol      = headers.findIndex(h => String(h).includes('Sub-account Name'));
   const freightCol   = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
-  const codCol       = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
+  // COD ต้องไม่ match "COD Amt" — ไฟล์ Flash มีทั้ง col 27 (COD Amt) และ col 31 (COD )
+  const codCol       = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()) && !String(h).toLowerCase().includes('amt'));
   const happyCol     = headers.findIndex(h => String(h).includes('Happy Return'));
   const remoteCol    = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
   const totalVatCol  = headers.findIndex(h => String(h).includes('Total รวม Vat') || String(h).includes('Total+Vat'));
   const touristCol   = headers.findIndex(h => String(h).includes('พื้นที่ท่องเที่ยว'));
   const pkgCol       = headers.findIndex(h => String(h).includes('Packaging'));
-  // Flash Care และ Box Shield (มี VAT)
-  const flashCareCol = headers.findIndex(h => /flash\s*care/i.test(String(h)));
+  const flashCareCol = headers.findIndex(h => /flash\s*care/i.test(String(h)) && !String(h).toLowerCase().includes('flash care flash'));
   const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)));
 
   if (dateCol < 0 || accCol < 0) return parseFlashPivot(sheets, carrier);
 
-  const VAT_RATE = 0.07;
+  // Flash col 0 (Date) อาจเป็น formula =IFERROR(LEFT(C2,11),0)
+  // ถ้าอ่านไม่ได้ให้ fallback ใช้ col 2 (PU time) ที่มี timestamp จริง
+  const puTimeCol = 2; // col C = PU time = "2026-04-29 17:11:32"
+
+  function extractFlashDate(row) {
+    // ลอง dateCol ก่อน
+    const v0 = String(row[dateCol] || '').trim();
+    const d0 = v0.slice(0,10).replace(/\//g,'-');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d0)) return d0;
+    // fallback: PU time col (format: "\t2026-04-29 17:11:32")
+    const v2 = String(row[puTimeCol] || '').trim().replace(/^\t+/,'');
+    const d2 = v2.slice(0,10).replace(/\//g,'-');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d2)) return d2;
+    return '';
+  }
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
-    const rowDate = String(row[dateCol] || '').trim();
-    // Flash format: YYYY-MM-DD หรือ YYYY/MM/DD
-    const rowDateNorm = rowDate.slice(0,10).replace(/\//g,'-');
-    if (!rowDateNorm || !targetDates.some(d => rowDateNorm === d || rowDate.includes(d.replace(/-/g,'/')))) continue;
+    const rowDateNorm = extractFlashDate(row);
+    if (!rowDateNorm || !targetDates.includes(rowDateNorm)) continue;
     const acc  = String(row[accCol]  || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
