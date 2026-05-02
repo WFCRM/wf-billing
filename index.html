@@ -1205,18 +1205,20 @@ function calculateBills() {
   const today   = now.getDay();
   const dateNum = now.getDate();
 
-  function shouldBillToday(type) {
+  function shouldBillToday(type, billDate) {
     if (!type || SKIP_TYPES.some(s => String(type).includes(s))) return false;
     const t = String(type).trim();
     if (t === '' || t === 'เงินสด')       return true;
     if (t === 'ไม่ต้องปิดใบเสร็จ')        return true;
-    if (t === 'Credit7D')  {
-      // ปกติ: วันจันทร์ (today===1) หรือ compensate mode
-      return today === 1 || state.compensateCredit7D;
+    if (t === 'Credit7D') {
+      // เช็คต่อวันของ row นั้น ว่าเป็นวันจันทร์ไหม
+      const d = billDate ? new Date(billDate) : now;
+      return d.getDay() === 1 || state.compensateCredit7D;
     }
     if (t === 'Credit15D') {
-      // ปกติ: วันที่ 1 หรือ 16 หรือ compensate mode
-      return dateNum === 1 || dateNum === 16 || state.compensateCredit15D;
+      const d = billDate ? new Date(billDate) : now;
+      const dn = d.getDate();
+      return dn === 1 || dn === 16 || state.compensateCredit15D;
     }
     if (t === 'Credit30D')    return false;
     if (t === 'เปิดบิลรวม')  return false;
@@ -1308,16 +1310,16 @@ function calculateBills() {
     }
 
     // Credit7D/15D — บันทึกสะสม แต่เปิดบิลเฉพาะตอนถึงรอบ
-    if (custType === 'Credit7D' && !shouldBillToday(custType)) {
+    if (custType === 'Credit7D' && !shouldBillToday(custType, b.billDate)) {
       credit7DRaw.push({ ...b, type: custType });
       continue;
     }
-    if (custType === 'Credit15D' && !shouldBillToday(custType)) {
+    if (custType === 'Credit15D' && !shouldBillToday(custType, b.billDate)) {
       credit15DRaw.push({ ...b, type: custType });
       continue;
     }
 
-    if (!shouldBillToday(custType || 'เงินสด')) continue;
+    if (!shouldBillToday(custType || 'เงินสด', b.billDate)) continue;
 
     // special group
     let groupKey = null, groupName = '';
@@ -1656,6 +1658,26 @@ function isOverdueDate(dateStr) {
   return d < new Date();
 }
 
+// ─── Custom Modal (แทน window.confirm ที่ถูก suppress) ────────
+function showConfirmModal(msg) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:12px;padding:24px 28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18)';
+    box.innerHTML = `
+      <div style="font-size:14px;line-height:1.7;white-space:pre-line;margin-bottom:20px;color:#1c1b17">${msg}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button id="_modal_cancel" style="padding:8px 18px;border-radius:7px;border:1px solid #ccc;background:#f5f4f0;cursor:pointer;font-family:inherit;font-size:13px">ยกเลิก</button>
+        <button id="_modal_ok" style="padding:8px 18px;border-radius:7px;border:none;background:#0a7c55;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600">ยืนยัน</button>
+      </div>`;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    box.querySelector('#_modal_ok').onclick     = () => { document.body.removeChild(overlay); resolve(true); };
+    box.querySelector('#_modal_cancel').onclick = () => { document.body.removeChild(overlay); resolve(false); };
+  });
+}
+
 async function syncFlowaccount(btn) {
   const orig = btn.innerHTML;
   btn.disabled = true;
@@ -1830,7 +1852,7 @@ async function confirmPeriodicBills(creditType) {
   const grouped = Object.values(g);
   const totalAmt = grouped.reduce((s,g)=>s+g.total,0).toLocaleString('th-TH',{minimumFractionDigits:2});
 
-  if (!confirm(`ยืนยันเปิดบิล ${creditType} จำนวน ${grouped.length} ราย\nยอดรวม ฿${totalAmt}\n\nระบบจะเปิดบิลใน Flowaccount และล้างข้อมูลสะสม`)) return;
+  if (!await showConfirmModal(`ยืนยันเปิดบิล ${creditType} จำนวน ${grouped.length} ราย\nยอดรวม ฿${totalAmt}\n\nระบบจะเปิดบิลใน Flowaccount และล้างข้อมูลสะสม`)) return;
 
   const selDate = new Date().toISOString().slice(0,10);
   const results = [];
@@ -2048,12 +2070,12 @@ async function confirmBills() {
     const dups = dupChecks.filter(d => d.duplicate);
     if (dups.length > 0) {
       const dupList = dups.map(d => `• ${d.name} (${d.subAcc}) — BL: ${d.blNo||'?'}`).join('\n');
-      const proceed = confirm(`⚠️ พบรายการที่เปิดบิลวันที่ ${dateDisplay} ไปแล้ว:\n\n${dupList}\n\nต้องการเปิดบิลซ้ำหรือไม่?\n(กด OK = เปิดซ้ำ, Cancel = ยกเลิก)`);
+      const proceed = await showConfirmModal(`⚠️ พบรายการที่เปิดบิลวันที่ ${dateDisplay} ไปแล้ว:\n\n${dupList}\n\nต้องการเปิดบิลซ้ำหรือไม่?`);
       if (!proceed) return;
     }
   } catch(e) { console.log('dup check error:', e); }
 
-  if (!confirm(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
+  if (!await showConfirmModal(`ยืนยันเปิดบิล ${selected.length} รายการ\nยอดรวม ฿${totalFmt}\n\nระบบจะเปิดบิลใน Flowaccount และบันทึกลง Google Sheet`)) return;
   const bills = selected.map(b => ({
     subAcc:    b.subAcc,
     flowName:  getFlowName(b.subAcc),
