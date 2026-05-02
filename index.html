@@ -938,14 +938,28 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   const puTimeCol = 2; // col C = PU time = "2026-04-29 17:11:32"
 
   function extractFlashDate(row) {
-    // ลอง dateCol ก่อน
-    const v0 = String(row[dateCol] || '').trim();
-    const d0 = v0.slice(0,10).replace(/\//g,'-');
-    if (/^\d{4}-\d{2}-\d{2}$/.test(d0)) return d0;
-    // fallback: PU time col (format: "\t2026-04-29 17:11:32")
-    const v2 = String(row[puTimeCol] || '').trim().replace(/^\t+/,'');
-    const d2 = v2.slice(0,10).replace(/\//g,'-');
-    if (/^\d{4}-\d{2}-\d{2}$/.test(d2)) return d2;
+    // helper: แปลงค่าเป็น YYYY-MM-DD ไม่ว่าจะเป็น string หรือ Date object
+    function toISODate(v) {
+      if (!v && v !== 0) return '';
+      // Date object
+      if (v instanceof Date) {
+        return v.getFullYear() + '-' +
+               String(v.getMonth()+1).padStart(2,'0') + '-' +
+               String(v.getDate()).padStart(2,'0');
+      }
+      const s = String(v).trim().replace(/^\t+/,'');
+      // YYYY-MM-DD หรือ YYYY/MM/DD
+      const m1 = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if (m1) return `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+      return '';
+    }
+
+    // ลอง dateCol (col 0) ก่อน
+    const d0 = toISODate(row[dateCol]);
+    if (d0) return d0;
+    // fallback: PU time col (col 2) — อาจเป็น Date object หรือ string timestamp
+    const d2 = toISODate(row[puTimeCol]);
+    if (d2) return d2;
     return '';
   }
   const VAT_RATE = 0.07;
