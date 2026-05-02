@@ -508,20 +508,28 @@ const ACCOUNT_MAPPING = {
 
 function getFlowName(subAcc) {
   const acc = String(subAcc).trim();
-  // 1. ลอง ACCOUNT_MAPPING ตรงๆ ก่อน (map ครอบคลุมทั้ง CZ-xxx และ CZ0108-xxx แล้ว)
+
+  // helper: normalize Flash acc CZ0108-xxx ↔ CZ-xxx
+  function normFlash(a) {
+    if (/^CZ0108-(\d+)/.test(a)) return 'CZ-' + a.replace('CZ0108-','');
+    if (/^CZ-(\d+)/.test(a))     return 'CZ0108-' + a.replace('CZ-','');
+    return '';
+  }
+
+  // 1. ลอง state.flowNames ตรงๆ ก่อน (จาก Sheet ชื่อตามใบกำกับ)
+  if (state.flowNames[acc]) return state.flowNames[acc];
+
+  // 2. normalize แล้วลองอีกครั้ง (Flash CZ0108-xxx ↔ CZ-xxx)
+  const normAcc = normFlash(acc);
+  if (normAcc && state.flowNames[normAcc]) return state.flowNames[normAcc];
+
+  // 3. fallback: ACCOUNT_MAPPING เดิม (hardcode)
   if (ACCOUNT_MAPPING[acc]?.flowName) return ACCOUNT_MAPPING[acc].flowName;
-  // 2. normalize แล้วลองอีกครั้ง
-  if (/^CZ-\d+/.test(acc)) {
-    const norm = 'CZ0108-' + acc.replace('CZ-','');
-    if (ACCOUNT_MAPPING[norm]?.flowName) return ACCOUNT_MAPPING[norm].flowName;
-  }
-  if (/^CZ0108-\d+/.test(acc)) {
-    const norm = 'CZ-' + acc.replace('CZ0108-','');
-    if (ACCOUNT_MAPPING[norm]?.flowName) return ACCOUNT_MAPPING[norm].flowName;
-  }
-  // 3. fallback: ใช้ชื่อจาก CustomerTypes Sheet (ตัดเลขนำหน้าแล้ว)
+  if (normAcc && ACCOUNT_MAPPING[normAcc]?.flowName) return ACCOUNT_MAPPING[normAcc].flowName;
+
+  // 4. fallback สุดท้าย: ชื่อจาก CustomerTypes
   const ct = state.customerTypes[acc];
-  if (ct?.name) return ct.name;
+  if (ct?.name) return ct.name.replace(/^\d+/,'').trim();
   return acc;
 }
 
@@ -539,6 +547,7 @@ let state = {
   typeFilter: '',
   compensateCredit7D:  false,
   compensateCredit15D: false,
+  flowNames: {}, // ชื่อบนใบกำกับ จาก Sheet ชื่อตามใบกำกับ
 };
 
 // ─── Init ─────────────────────────────────────────────────────
@@ -730,6 +739,11 @@ async function loadCustomersFromSheet() {
       console.log('โหลด CustomerTypes:', Object.keys(cleaned).length, 'accounts');
     } else {
       console.log('CustomerTypes: ไม่มีข้อมูลใน Sheet ใช้ค่า default');
+    }
+    // โหลด flowNames จาก Sheet ชื่อตามใบกำกับ
+    if (data.flowNames && Object.keys(data.flowNames).length > 0) {
+      state.flowNames = data.flowNames;
+      console.log('โหลด flowNames:', Object.keys(data.flowNames).length, 'accounts');
     }
   } catch(e) {
     console.log('loadCustomers error:', e.message);
@@ -1148,6 +1162,10 @@ function parseWefastDaily(sheets, targetDates) {
     if (!rowDate || !targetDates.includes(rowDate)) continue;
     const acc  = String(row[accCol] || '').trim();
     if (!acc || acc === 'nan') continue;
+    // filter เฉพาะ account ที่มีใน CustomerTypes Sheet
+    // account ที่ไม่มี = ไม่ต้องเปิดบิล
+    const wfdType = (state?.customerTypes?.[acc]?.type) || '';
+    if (!wfdType || wfdType.includes('Internal') || wfdType.includes('ไม่เปิดบิล')) continue;
     const name = String(row[nameCol] || acc).trim();
     const key  = `${acc}|${rowDate}`;
     if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
@@ -1234,7 +1252,7 @@ function calculateBills() {
   function shouldBillToday(type, billDate) {
     if (!type || SKIP_TYPES.some(s => String(type).includes(s))) return false;
     const t = String(type).trim();
-    if (t === '' || t === 'เงินสด')       return true;
+    if (t === '' || t === 'เงินสด' || t === 'เปิดบิลทุกวัน') return true;
     if (t === 'ไม่ต้องปิดใบเสร็จ')        return true;
     if (t === 'Credit7D') {
       if (state.compensateCredit7D) return true;
@@ -1790,6 +1808,38 @@ async function markPaid(blNo, carrier) {
 }
 
 // ─── Periodic Bills Page (Credit7D/15D รวมรอบ) ───────────────
+function applyPeriodicFilter() {
+  const from = document.getElementById('periodic-from')?.value; // YYYY-MM-DD
+  const to   = document.getElementById('periodic-to')?.value;
+  const rows7d  = window._periodicRows7d  || [];
+  const rows15d = window._periodicRows15d || [];
+
+  function filterRows(rows) {
+    if (!from && !to) return rows;
+    return rows.filter(r => {
+      const d = String(r['วันที่รับงาน'] || '').trim();
+      // แปลง dd/MM/yyyy → YYYY-MM-DD
+      let dateISO = d;
+      const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) dateISO = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      if (from && dateISO < from) return false;
+      if (to   && dateISO > to)   return false;
+      return true;
+    });
+  }
+
+  const c = document.getElementById('main-content');
+  renderPeriodicUI(c, filterRows(rows7d), filterRows(rows15d));
+  // restore date inputs หลัง re-render
+  if (from) document.getElementById('periodic-from').value = from;
+  if (to)   document.getElementById('periodic-to').value   = to;
+}
+
+function clearPeriodicFilter() {
+  const c = document.getElementById('main-content');
+  renderPeriodicUI(c, window._periodicRows7d || [], window._periodicRows15d || []);
+}
+
 async function renderPeriodic() {
   const c = document.getElementById('main-content');
   c.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:40px">
@@ -1880,8 +1930,21 @@ function renderPeriodicUI(c, rows7d, rows15d) {
       </div>`;
   }
 
+  window._periodicRows7d  = rows7d;
+  window._periodicRows15d = rows15d;
+
   c.innerHTML = `
   <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card">
+      <div class="card-body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text2);font-weight:600">กรองช่วงวันที่รับงาน:</span>
+        <input type="date" id="periodic-from" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit">
+        <span style="color:var(--text3)">–</span>
+        <input type="date" id="periodic-to" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit">
+        <button class="btn btn-sm" onclick="applyPeriodicFilter()">กรอง</button>
+        <button class="btn btn-sm" style="background:var(--bg2);color:var(--text2)" onclick="clearPeriodicFilter()">ล้าง</button>
+      </div>
+    </div>
     <div class="card">
       <div class="card-hd"><div class="card-title">💳 Credit 7 วัน (รอบจันทร์)</div>
         <span style="font-size:11px;color:var(--text3)">${rows7d.length} แถวสะสม</span>
