@@ -1211,14 +1211,42 @@ function calculateBills() {
     if (t === '' || t === 'เงินสด')       return true;
     if (t === 'ไม่ต้องปิดใบเสร็จ')        return true;
     if (t === 'Credit7D') {
-      // เช็คต่อวันของ row นั้น ว่าเป็นวันจันทร์ไหม
+      if (state.compensateCredit7D) return true;
       const d = billDate ? new Date(billDate) : now;
-      return d.getDay() === 1 || state.compensateCredit7D;
+      // หา thisMonday = วันจันทร์ล่าสุด (วันนี้ถ้าเป็นจันทร์)
+      // ใช้ targetDates[0] เป็น reference ของ "วันจันทร์ที่เปิดบิล"
+      const ref = new Date(targetDates[0]);
+      const refDay = ref.getDay(); // 0=อา, 1=จ
+      const daysToMon = refDay === 1 ? 0 : (refDay === 0 ? -6 : 1 - refDay);
+      const thisMonday = new Date(ref); thisMonday.setDate(ref.getDate() + daysToMon); thisMonday.setHours(0,0,0,0);
+      const prevMonday = new Date(thisMonday); prevMonday.setDate(thisMonday.getDate() - 7);
+      const lastSunday = new Date(thisMonday); lastSunday.setDate(thisMonday.getDate() - 1); lastSunday.setHours(23,59,59,999);
+      // billDate อยู่ใน [prevMonday, lastSunday] → เปิดบิล
+      // billDate >= thisMonday → สะสม
+      d.setHours(12,0,0,0);
+      return d >= prevMonday && d <= lastSunday;
     }
     if (t === 'Credit15D') {
+      if (state.compensateCredit15D) return true;
       const d = billDate ? new Date(billDate) : now;
-      const dn = d.getDate();
-      return dn === 1 || dn === 16 || state.compensateCredit15D;
+      const ref = new Date(targetDates[0]);
+      const dn = ref.getDate();
+      // วันที่ 1 → รอบงาน 16-สิ้นเดือนก่อน, วันที่ 16 → รอบงาน 1-15 เดือนนี้
+      if (dn === 1) {
+        // งานรับ 16-สิ้นเดือนก่อน
+        const prevMonth = new Date(ref.getFullYear(), ref.getMonth() - 1, 16);
+        const lastDay   = new Date(ref.getFullYear(), ref.getMonth(), 0);
+        d.setHours(12,0,0,0);
+        return d >= prevMonth && d <= lastDay;
+      }
+      if (dn === 16) {
+        // งานรับ 1-15 เดือนนี้
+        const first = new Date(ref.getFullYear(), ref.getMonth(), 1);
+        const fifteenth = new Date(ref.getFullYear(), ref.getMonth(), 15);
+        d.setHours(12,0,0,0);
+        return d >= first && d <= fifteenth;
+      }
+      return false;
     }
     if (t === 'Credit30D')    return false;
     if (t === 'เปิดบิลรวม')  return false;
@@ -1750,7 +1778,8 @@ function renderPeriodicUI(c, rows7d, rows15d) {
     const g = {};
     rows.forEach(r => {
       const key = `${r['Sub Account']}|${r['Carrier']}`;
-      if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], freight:0, cod:0, total:0, dates:[] };
+      if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], trackingCount:0, freight:0, cod:0, total:0, dates:[] };
+      g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
       g[key].freight += parseFloat(r['Freight']||0);
       g[key].cod     += parseFloat(r['COD']||0);
       g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
@@ -1861,15 +1890,16 @@ async function confirmPeriodicBills(creditType) {
       ? `งานวันที่ ${bill.dates.sort()[0].replace(/\d{4}/,d=>parseInt(d)+543)} - ${bill.dates.sort().at(-1).replace(/\d{4}/,d=>parseInt(d)+543)}//${bill.carrier.replace(' WF','').replace(' GAP','')}`
       : '';
     const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
-      subAcc:    bill.subAcc,
-      flowName:  bill.flowName,
-      carrier:   bill.carrier,
-      type:      creditType,
-      dateRange: dateRange,
-      billDate:  selDate,
-      freight:   bill.freight,
-      cod:       bill.cod,
-      total:     bill.total,
+      subAcc:        bill.subAcc,
+      flowName:      bill.flowName,
+      carrier:       bill.carrier,
+      type:          creditType,
+      dateRange:     dateRange,
+      billDate:      selDate,
+      trackingCount: bill.trackingCount || 0,
+      freight:       bill.freight,
+      cod:           bill.cod,
+      total:         bill.total,
     }}));
     try {
       const r = await fetch(GAS_URL + '?data=' + payload).then(r=>r.json());
