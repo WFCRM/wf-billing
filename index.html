@@ -1139,7 +1139,7 @@ function parseWefastDaily(sheets, targetDates) {
   const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)) || String(h).includes('ประกันกล่อง'));
   const remoteCol    = headers.findIndex(h => String(h).trim() === 'พื้นที่ห่างไกล');
   const touristCol   = headers.findIndex(h => String(h).includes('พื้นทีท่องเที่ยว') || String(h).includes('พื้นที่ท่องเที่ยว'));
-  // ใช้ grandCol ถ้ามี ถ้าไม่มีใช้ totalCol
+  const returnFeeCol = headers.findIndex(h => String(h).trim() === 'ค่าตีกลับ');
   const amtCol = grandCol >= 0 ? grandCol : (totalCol >= 0 ? totalCol : priceCol);
 
   if (accCol < 0) { console.log('WefastD: ไม่พบ column Account'); return []; }
@@ -1174,7 +1174,7 @@ function parseWefastDaily(sheets, targetDates) {
     if (!wfdType || wfdType.includes('Internal') || wfdType.includes('ไม่เปิดบิล')) continue;
     const name = String(row[nameCol] || acc).trim();
     const key  = `${acc}|${rowDate}`;
-    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, remote:0, tourist:0, happy:0, pkg:0, total:0 };
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, remote:0, tourist:0, returnFee:0, happy:0, pkg:0, total:0 };
     grouped[key].trackingCount += 1;
     grouped[key].freight        += parseFloat(row[priceCol])     || 0;
     grouped[key].total          += parseFloat(row[amtCol])       || 0;
@@ -1183,6 +1183,7 @@ function parseWefastDaily(sheets, targetDates) {
     grouped[key].boxShield      += parseFloat(row[boxShieldCol]) || 0;
     grouped[key].remote         += parseFloat(row[remoteCol])    || 0;
     grouped[key].tourist        += parseFloat(row[touristCol])   || 0;
+    grouped[key].returnFee      += parseFloat(row[returnFeeCol]) || 0;
   }
   Object.values(grouped).forEach(b => {
     b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
@@ -2226,6 +2227,7 @@ async function confirmBills() {
     happy:         parseFloat(b.happy)     || 0,
     remote:        parseFloat(b.remote)    || 0,
     tourist:       parseFloat(b.tourist)   || 0,
+    returnFee:     parseFloat(b.returnFee) || 0,
     pkg:           parseFloat(b.pkg)       || 0,
     flashCare:     parseFloat(b.flashCare) || 0,
     boxShield:     parseFloat(b.boxShield) || 0,
