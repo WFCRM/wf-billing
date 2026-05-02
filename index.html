@@ -1106,55 +1106,64 @@ function parseDHLDaily(sheets, targetDates) {
 
 // ─── Parse WefastD ───────────────────────────────────────────
 function parseWefastDaily(sheets, targetDates) {
-  // WF_ACCOUNTS: accounts ที่ต้องเปิดบิล (key = account, value = type default)
-  const WF_ACCOUNTS = { 'WF238':'Credit7D', 'WF1663':'เงินสด', 'WF1955':'Credit15D' };
-  // ลองหา sheet ชื่อ "ข้อมูลรายละเอียด" หรือ sheet แรกที่ไม่ใช่ summary
   const sname = Object.keys(sheets).find(n => n.includes('ข้อมูลรายละเอียด') || n.includes('detail') || n.includes('Daily') || n.includes('รายละเอียด'));
-  if (!sname) {
-    console.log('WefastD: ไม่พบ sheet ข้อมูลรายละเอียด, sheets:', Object.keys(sheets));
-    return [];
-  }
+  if (!sname) { console.log('WefastD: ไม่พบ sheet ข้อมูลรายละเอียด, sheets:', Object.keys(sheets)); return []; }
   const rows = sheets[sname];
   if (!rows || rows.length < 2) return [];
   const headers = rows[0];
   console.log('WefastD headers:', headers.slice(0,15));
-  const dateCol      = headers.findIndex(h => /^date$/i.test(String(h).trim()) || String(h).includes('วันที่'));
+
+  const dateCol      = headers.findIndex(h => /^date$/i.test(String(h).trim()) || String(h).includes('วันรับงาน') || String(h).includes('วันที่'));
   const accCol       = headers.findIndex(h => /^account$/i.test(String(h).trim()) || String(h).includes('Sub Account'));
   const nameCol      = headers.findIndex(h => /customer\s*name/i.test(String(h)) || String(h).includes('ชื่อลูกค้า'));
   const priceCol     = headers.findIndex(h => String(h).includes('ราคา (บาท)') || /^price$/i.test(String(h).trim()));
-  const totalCol     = headers.findIndex(h => /grand\s*total/i.test(String(h)) || String(h).includes('ยอดรวม'));
+  const totalCol     = headers.findIndex(h => /grand\s*total/i.test(String(h)) || String(h).trim() === 'รวม' || String(h).includes('Grand Total'));
   const codCol       = headers.findIndex(h => String(h).trim().startsWith('เก็บเงิน') || /^cod$/i.test(String(h).trim()));
   const insuranceCol = headers.findIndex(h => String(h).includes('ประกันสินค้า') || /insurance/i.test(String(h)));
   const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)) || String(h).includes('ประกันกล่อง'));
 
-  if (accCol < 0) {
-    console.log('WefastD: ไม่พบ column Account');
-    return [];
+  if (accCol < 0) { console.log('WefastD: ไม่พบ column Account'); return []; }
+
+  // helper: แปลง date ทุก format → YYYY-MM-DD
+  function normWFDate(v) {
+    if (!v) return '';
+    if (v instanceof Date) {
+      return v.getFullYear() + '-' + String(v.getMonth()+1).padStart(2,'0') + '-' + String(v.getDate()).padStart(2,'0');
+    }
+    const s = String(v).trim().replace(/^\t+/,'');
+    // DD/MM/YYYY หรือ DD/MM/YYYY HH:MM:SS
+    const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m1) return `${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+    // YYYY-MM-DD
+    const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m2) return s.slice(0,10);
+    return '';
   }
 
   const VAT_RATE = 0.07;
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
-    const row  = rows[i];
-    const rowDate = String(row[dateCol] || '').trim().slice(0,10);
-    if (dateCol >= 0 && !targetDates.some(d => rowDate === d || rowDate.includes(d))) continue;
+    const row     = rows[i];
+    const rowDate = normWFDate(row[dateCol]);
+    if (!rowDate || !targetDates.includes(rowDate)) continue;
     const acc  = String(row[accCol] || '').trim();
-    if (!WF_ACCOUNTS[acc]) continue;
+    if (!acc || acc === 'nan') continue;
     const name = String(row[nameCol] || acc).trim();
-    const key = `${acc}|${rowDate}`; // แยกตามวัน
-    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, freight:0, cod:0, insurance:0, boxShield:0, happy:0, remote:0, tourist:0, pkg:0, total:0, overrideType: WF_ACCOUNTS[acc] };
-    grouped[key].freight   += parseFloat(row[priceCol])     || 0;
-    grouped[key].total     += parseFloat(row[totalCol])     || 0;
-    grouped[key].cod       += parseFloat(row[codCol])       || 0;
-    grouped[key].insurance += parseFloat(row[insuranceCol]) || 0;
-    grouped[key].boxShield += parseFloat(row[boxShieldCol]) || 0;
+    const key  = `${acc}|${rowDate}`;
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    grouped[key].trackingCount += 1;
+    grouped[key].freight        += parseFloat(row[priceCol])     || 0;
+    grouped[key].total          += parseFloat(row[totalCol])     || 0;
+    grouped[key].cod            += parseFloat(row[codCol])       || 0;
+    grouped[key].insurance      += parseFloat(row[insuranceCol]) || 0;
+    grouped[key].boxShield      += parseFloat(row[boxShieldCol]) || 0;
   }
-  // VAT สำหรับ ประกันสินค้า และ Box Shield
   Object.values(grouped).forEach(b => {
     b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
     b.boxShieldVat = b.boxShield > 0 ? parseFloat((b.boxShield * VAT_RATE).toFixed(2)) : 0;
   });
-  return Object.values(grouped).filter(b => b.total > 0);
+  // ไม่ filter ด้วย WF_ACCOUNTS hardcode — ให้ CustomerTypes lookup ที่ calculateBills จัดการแทน
+  return Object.values(grouped).filter(b => b.total > 0 || b.freight > 0);
 }
 
 // ─── Parse SPX ───────────────────────────────────────────────
@@ -1165,29 +1174,46 @@ function parseSPXDaily(sheets, targetDates) {
   if (!rows || rows.length < 2) return [];
   const headers = rows[0];
   const dateCol    = headers.findIndex(h => String(h).trim() === 'Date');
+  const puTimeCol  = headers.findIndex(h => String(h).includes('PU time'));
   const accCol     = headers.findIndex(h => String(h).trim() === 'Account');
   const nameCol    = headers.findIndex(h => String(h).includes('Sub-account Name'));
+  // Freight: ใช้ col แรกที่ match 'Freight ' (ไม่ใช่ 'Freight  SPX')
   const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
-  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()));
+  const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()) && !String(h).toLowerCase().includes('amt'));
   const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
   const totalCol   = headers.findIndex(h => String(h).includes('Total+Vat') || String(h).includes('Total รวม Vat'));
   if (accCol < 0) return [];
+
+  // helper: date จาก cell (เหมือน Flash)
+  function normDate(v, fallbackV) {
+    const tryParse = (val) => {
+      if (!val && val !== 0) return '';
+      if (val instanceof Date) return val.getFullYear()+'-'+String(val.getMonth()+1).padStart(2,'0')+'-'+String(val.getDate()).padStart(2,'0');
+      const s = String(val).trim().replace(/^\t+/,'');
+      const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+      return '';
+    };
+    return tryParse(v) || tryParse(fallbackV) || '';
+  }
+
   const grouped = {};
   for (let i = 1; i < rows.length; i++) {
-    const row  = rows[i];
-    const rowDate = String(row[dateCol] || '').trim().slice(0,10);
-    if (!targetDates.some(d => rowDate === d)) continue;
+    const row     = rows[i];
+    const rowDate = normDate(row[dateCol], row[puTimeCol]);
+    if (!rowDate || !targetDates.includes(rowDate)) continue;
     const acc  = String(row[accCol] || '').trim();
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
-    const key = `${acc}|${rowDate}`; // แยกตามวัน
-    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    const key = `${acc}|${rowDate}`;
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    grouped[key].trackingCount += 1;
     grouped[key].freight += parseFloat(row[freightCol]) || 0;
     grouped[key].cod     += parseFloat(row[codCol])     || 0;
     grouped[key].remote  += parseFloat(row[remoteCol])  || 0;
     grouped[key].total   += parseFloat(row[totalCol])   || 0;
   }
-  return Object.values(grouped).filter(b => b.total > 0);
+  return Object.values(grouped).filter(b => b.total > 0 || b.freight > 0);
 }
 
 // ─── Calculate bills ──────────────────────────────────────────
