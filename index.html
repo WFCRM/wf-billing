@@ -1268,8 +1268,12 @@ function calculateBills() {
       cod:           parseFloat(b.cod)     || 0,
       total:         parseFloat(b.total)   || 0,
     }));
-    const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulateCredit', bills: payload, creditType }));
-    const resp = await fetch(GAS_URL + '?data=' + p);
+    const body = JSON.stringify({ action: 'saveAccumulateCredit', bills: payload, creditType });
+    const resp = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
     const data = await resp.json();
     console.log(`saveAccumulateCredit ${creditType}:`, data.ok, 'saved:', data.saved);
     return data;
@@ -1427,8 +1431,11 @@ function calculateBills() {
       total:         parseFloat(b.total)   || 0,
       noReceipt:     false,
     }));
-    const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulate', bills: accPayload }));
-    fetch(GAS_URL + '?data=' + p)
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'saveAccumulate', bills: accPayload }),
+    })
       .then(r => r.json())
       .then(d => {
         console.log('saveAccumulate:', d.ok, 'saved:', d.saved);
