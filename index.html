@@ -2060,17 +2060,16 @@ async function confirmBills() {
     carrier:       b.carrier,
     type:          b.type,
     dateRange:     b.dateRange,
-    billDate:      b.billDate || selDate, // วันที่จริงของ bill นั้น (ไม่ใช่วันที่ส่วน UI)
+    billDate:      b.billDate || selDate,
     trackingCount: b.trackingCount || 0,
+    freight:       parseFloat(b.freight)   || 0,
     cod:           parseFloat(b.cod)       || 0,
     happy:         parseFloat(b.happy)     || 0,
     remote:        parseFloat(b.remote)    || 0,
     tourist:       parseFloat(b.tourist)   || 0,
     pkg:           parseFloat(b.pkg)       || 0,
-    // Flash
     flashCare:     parseFloat(b.flashCare) || 0,
     boxShield:     parseFloat(b.boxShield) || 0,
-    // DHL
     paperPod:      parseFloat(b.paperPod)  || 0,
     insurance:     parseFloat(b.insurance) || 0,
     amDeliv:       parseFloat(b.amDeliv)   || 0,
