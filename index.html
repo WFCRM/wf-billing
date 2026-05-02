@@ -1268,15 +1268,18 @@ function calculateBills() {
       cod:           parseFloat(b.cod)     || 0,
       total:         parseFloat(b.total)   || 0,
     }));
-    const body = JSON.stringify({ action: 'saveAccumulateCredit', bills: payload, creditType });
-    const resp = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-    const data = await resp.json();
-    console.log(`saveAccumulateCredit ${creditType}:`, data.ok, 'saved:', data.saved);
-    return data;
+    // แบ่ง chunk ละ 5 รายการ เพื่อไม่ให้ URL ยาวเกิน limit
+    const CHUNK = 5;
+    let saved = 0;
+    for (let i = 0; i < payload.length; i += CHUNK) {
+      const chunk = payload.slice(i, i + CHUNK);
+      const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulateCredit', bills: chunk, creditType }));
+      const resp = await fetch(GAS_URL + '?data=' + p);
+      const data = await resp.json();
+      if (data.saved) saved += data.saved;
+    }
+    console.log(`saveAccumulateCredit ${creditType}: saved=${saved}`);
+    return { ok: true, saved };
   }
 
   function isAccumulateType(type) {
@@ -1431,22 +1434,21 @@ function calculateBills() {
       total:         parseFloat(b.total)   || 0,
       noReceipt:     false,
     }));
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'saveAccumulate', bills: accPayload }),
-    })
-      .then(r => r.json())
-      .then(d => {
-        console.log('saveAccumulate:', d.ok, 'saved:', d.saved);
-        if (d.ok) {
-          // แสดง alert แจ้งว่าบันทึกเปิดบิลรวมแล้ว
-          const names = accumulateRaw.map(b => `• ${getFlowName(b.acc)} (${b.acc})`).join('\n');
-          alert(`📋 บันทึกลูกค้าเปิดบิลรวม ${accumulateRaw.length} รายการลง Sheet แล้ว\n\n${names}\n\nยอดรวมจะถูกเปิดบิลสิ้นเดือน`);
-        }
-      })
-      .catch(e => console.log('saveAccumulate error:', e));
+    // แบ่ง chunk เพื่อไม่ให้ URL ยาวเกิน limit
+    const CHUNK = 5;
+    let accSaved = 0;
+    for (let i = 0; i < accPayload.length; i += CHUNK) {
+      const chunk = accPayload.slice(i, i + CHUNK);
+      const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulate', bills: chunk }));
+      fetch(GAS_URL + '?data=' + p)
+        .then(r => r.json())
+        .then(d => { if (d.saved) accSaved += d.saved; })
+        .catch(e => console.log('saveAccumulate error:', e));
+    }
     console.log('บันทึกเปิดบิลรวม', accumulateRaw.length, 'รายการลง Sheet');
+    // แจ้งผล
+    const names = accumulateRaw.map(b => `• ${getFlowName(b.acc)} (${b.acc})`).join('\n');
+    alert(`📋 บันทึกลูกค้าเปิดบิลรวม ${accumulateRaw.length} รายการลง Sheet แล้ว\n\n${names}\n\nยอดรวมจะถูกเปิดบิลสิ้นเดือน`);
   }
 
   // บันทึก Credit7D สะสมรายวัน (เฉพาะวันที่ไม่ใช่รอบเปิดบิล)
