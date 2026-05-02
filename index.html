@@ -320,6 +320,11 @@ input[type=file] { display: none; }
       รายการเปิดบิลวันนี้
       <span class="nav-badge" id="bill-count">0</span>
     </div>
+    <div class="nav-item" onclick="showPage('periodic',this)">
+      <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="1.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.1"/><path d="M1 5h13" stroke="currentColor" stroke-width="1.1"/><path d="M4 8h7M4 11h5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/><circle cx="11.5" cy="10.5" r="2.5" fill="currentColor" opacity=".15" stroke="currentColor" stroke-width="1"/><path d="M11.5 9.5v1.5l1 .5" stroke="currentColor" stroke-width=".9" stroke-linecap="round"/></svg>
+      เปิดบิลรวมรอบ
+      <span class="nav-badge" id="periodic-count" style="display:none">!</span>
+    </div>
     <div class="nav-item" onclick="showPage('tracking',this)">
       <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.1"/><path d="M7.5 4.5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
       ติดตามค้างชำระ
@@ -351,6 +356,18 @@ input[type=file] { display: none; }
           <input type="checkbox" id="multi-date-check" onchange="toggleMultiDate(this.checked)" style="accent-color:var(--blue)">
           หลายวัน
         </label>
+        <!-- Toggle ชดเชยวันหยุด -->
+        <div id="compensate-wrap" style="display:none;align-items:center;gap:6px;margin-left:8px;padding-left:8px;border-left:1px solid var(--border2)">
+          <span style="font-size:10px;color:var(--text3)">ชดเชยวันหยุด:</span>
+          <label style="font-size:11px;color:var(--amber);display:flex;align-items:center;gap:3px;cursor:pointer" title="เปิดบิล Credit7D แทนวันจันทร์ที่หยุด">
+            <input type="checkbox" id="compensate-7d" onchange="toggleCompensate('7d',this.checked)" style="accent-color:var(--amber)">
+            Credit7D
+          </label>
+          <label style="font-size:11px;color:var(--purple);display:flex;align-items:center;gap:3px;cursor:pointer" title="เปิดบิล Credit15D แทนวันที่ 1/16 ที่หยุด">
+            <input type="checkbox" id="compensate-15d" onchange="toggleCompensate('15d',this.checked)" style="accent-color:var(--purple)">
+            Credit15D
+          </label>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="calculateBills()" id="calc-btn" style="display:none">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2v8" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -518,8 +535,10 @@ let state = {
   trackingCarrier: 'Flash',
   currentPage: 'upload',
   calculating: false,
-  customersLoaded: false, // flag รอ loadCustomersFromSheet เสร็จก่อนคำนวณได้
-  typeFilter: '',         // filter ประเภทใน bills page
+  customersLoaded: false,
+  typeFilter: '',
+  compensateCredit7D:  false,
+  compensateCredit15D: false,
 };
 
 // ─── Init ─────────────────────────────────────────────────────
@@ -740,14 +759,15 @@ function showPage(page, el) {
   else {
     // highlight nav item ที่ตรงกับ page
     const navItems = document.querySelectorAll('.nav-item');
-    const pageIdx = {overview:0,upload:1,bills:2,tracking:3};
+    const pageIdx = {overview:0,upload:1,bills:2,periodic:3,tracking:4,customers:5};
     if (pageIdx[page] !== undefined && navItems[pageIdx[page]])
       navItems[pageIdx[page]].classList.add('active');
   }
   const titles = {
-    overview: ['ภาพรวม','สถานะการเปิดบิลประจำวัน'],
-    upload:   ['อัปโหลดไฟล์รายงาน','เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ'],
-    bills:    ['รายการเปิดบิลวันนี้','คำนวณจากไฟล์ที่อัปโหลด แยกตามประเภทลูกค้า'],
+    overview:  ['ภาพรวม','สถานะการเปิดบิลประจำวัน'],
+    upload:    ['อัปโหลดไฟล์รายงาน','เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ'],
+    bills:     ['รายการเปิดบิลวันนี้','คำนวณจากไฟล์ที่อัปโหลด แยกตามประเภทลูกค้า'],
+    periodic:  ['เปิดบิลรวมรอบ','ดึงยอดสะสม Credit7D / Credit15D จาก Sheet มาเปิดบิล'],
     tracking:  ['ติดตามค้างชำระ','สถานะการชำระเงินของลูกค้าทั้งหมด'],
     customers: ['ข้อมูลลูกค้า','อัปโหลดไฟล์ data ลค. เพื่อกำหนดประเภทการเปิดบิล'],
   };
@@ -762,6 +782,7 @@ function render() {
   const c = document.getElementById('main-content');
   if      (state.currentPage === 'upload')   c.innerHTML = renderUpload();
   else if (state.currentPage === 'bills')    c.innerHTML = renderBills();
+  else if (state.currentPage === 'periodic') { renderPeriodic(); return; }
   else if (state.currentPage === 'tracking') { renderTracking(); return; }
   else if (state.currentPage === 'customers') { c.innerHTML = renderCustomers(); return; }
   else                                        c.innerHTML = renderOverview();
@@ -773,6 +794,7 @@ function render() {
   const showCtrl = hasFiles && state.currentPage === 'upload';
   if (calcBtn) calcBtn.style.display = showCtrl ? '' : 'none';
   if (dateSel) dateSel.style.display = showCtrl ? 'flex' : 'none';
+  showCompensateToggles(showCtrl);
 
   // badge count
   document.getElementById('bill-count').textContent = state.bills.length;
@@ -858,6 +880,16 @@ function handleFile(evt, key) {
 }
 
 // ─── Toggle multi-date ──────────────────────────────────────
+function toggleCompensate(type, checked) {
+  if (type === '7d')  state.compensateCredit7D  = checked;
+  if (type === '15d') state.compensateCredit15D = checked;
+}
+
+function showCompensateToggles(show) {
+  const el = document.getElementById('compensate-wrap');
+  if (el) el.style.display = show ? 'flex' : 'none';
+}
+
 function toggleMultiDate(checked) {
   const wrap = document.getElementById('multi-date-wrap');
   if (wrap) wrap.style.display = checked ? 'flex' : 'none';
@@ -1145,13 +1177,40 @@ function calculateBills() {
   function shouldBillToday(type) {
     if (!type || SKIP_TYPES.some(s => String(type).includes(s))) return false;
     const t = String(type).trim();
-    if (t === '' || t === 'เงินสด')         return true;
-    if (t === 'Credit7D')                   return today === 1;
-    if (t === 'Credit15D')                  return dateNum === 1 || dateNum === 16;
-    if (t === 'Credit30D')                  return false; // เปิดบิลรวมสิ้นเดือนเท่านั้น
-    if (t === 'เปิดบิลรวม')                 return false; // บันทึกสะสม ไม่เปิดบิลทุกวัน
-    if (t === 'ไม่ต้องปิดใบเสร็จ')          return true;
+    if (t === '' || t === 'เงินสด')       return true;
+    if (t === 'ไม่ต้องปิดใบเสร็จ')        return true;
+    if (t === 'Credit7D')  {
+      // ปกติ: วันจันทร์ (today===1) หรือ compensate mode
+      return today === 1 || state.compensateCredit7D;
+    }
+    if (t === 'Credit15D') {
+      // ปกติ: วันที่ 1 หรือ 16 หรือ compensate mode
+      return dateNum === 1 || dateNum === 16 || state.compensateCredit15D;
+    }
+    if (t === 'Credit30D')    return false;
+    if (t === 'เปิดบิลรวม')  return false;
     return false;
+  }
+
+  // helper: ส่งข้อมูลสะสม Credit7D/15D ลง Sheet
+  async function saveAccumulateCredit(bills, creditType) {
+    if (!bills || bills.length === 0) return;
+    const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
+    const payload = bills.map(b => ({
+      subAcc:   b.acc,
+      flowName: getFlowName(b.acc),
+      carrier:  b.carrier,
+      type:     creditType,
+      billDate: b.billDate || selDate,
+      freight:  parseFloat(b.freight) || 0,
+      cod:      parseFloat(b.cod)     || 0,
+      total:    parseFloat(b.total)   || 0,
+    }));
+    const p = encodeURIComponent(JSON.stringify({ action: 'saveAccumulateCredit', bills: payload, creditType }));
+    const resp = await fetch(GAS_URL + '?data=' + p);
+    const data = await resp.json();
+    console.log(`saveAccumulateCredit ${creditType}:`, data.ok, 'saved:', data.saved);
+    return data;
   }
 
   function isAccumulateType(type) {
@@ -1183,18 +1242,13 @@ function calculateBills() {
   // helper: lookup type โดย normalize key
   function lookupType(acc, name) {
     const a = String(acc || '').trim();
-    const n = String(name || '').trim();
     // ลอง exact match ก่อน
     if (custTypeMap[a]) return custTypeMap[a];
     // normalize CZ-xxx ↔ CZ0108-xxx
     if (/^CZ-\d+/.test(a))      return custTypeMap['CZ0108-' + a.replace('CZ-','')] || '';
     if (/^CZ0108-\d+/.test(a))  return custTypeMap['CZ-' + a.replace('CZ0108-','')] || '';
-    // fallback: หา key ที่ name ตรงกัน
-    const byName = Object.entries(state.customerTypes || {}).find(([,v]) => {
-      const vName = typeof v === 'string' ? '' : (v.name || '');
-      return vName && n && vName.includes(n.slice(0,8));
-    });
-    return byName ? (typeof byName[1] === 'string' ? byName[1] : byName[1].type || '') : '';
+    // ไม่พบใน Sheet → ใช้ default เงินสด (ไม่ใช้ name fallback เพราะ false positive สูง)
+    return '';
   }
 
   // parse ทุกไฟล์
@@ -1208,15 +1262,26 @@ function calculateBills() {
   // กำหนด type + กรอง internal
   const bills = [];
   const mergedGroups = {};
-  const accumulateRaw = []; // เก็บลูกค้าเปิดบิลรวมแยกออกมาก่อน
+  const accumulateRaw   = []; // เปิดบิลรวม + Credit30D
+  const credit7DRaw     = []; // Credit7D สะสมรายวัน
+  const credit15DRaw    = []; // Credit15D สะสมรายวัน
 
   for (const b of rawBills) {
     const custType = b.overrideType || lookupType(b.acc, b.name) || '';
     if (SKIP_TYPES.some(s => custType.includes(s))) continue;
 
-    // ─ เปิดบิลรวม: บันทึกสะสมทุกวัน ไม่ต้องรอเงื่อนไขวัน ─
     if (isAccumulateType(custType)) {
       accumulateRaw.push({ ...b, type: custType });
+      continue;
+    }
+
+    // Credit7D/15D — บันทึกสะสม แต่เปิดบิลเฉพาะตอนถึงรอบ
+    if (custType === 'Credit7D' && !shouldBillToday(custType)) {
+      credit7DRaw.push({ ...b, type: custType });
+      continue;
+    }
+    if (custType === 'Credit15D' && !shouldBillToday(custType)) {
+      credit15DRaw.push({ ...b, type: custType });
       continue;
     }
 
@@ -1312,6 +1377,28 @@ function calculateBills() {
       })
       .catch(e => console.log('saveAccumulate error:', e));
     console.log('บันทึกเปิดบิลรวม', accumulateRaw.length, 'รายการลง Sheet');
+  }
+
+  // บันทึก Credit7D สะสมรายวัน (เฉพาะวันที่ไม่ใช่รอบเปิดบิล)
+  if (credit7DRaw.length > 0) {
+    saveAccumulateCredit(credit7DRaw, 'Credit7D').then(() => {
+      console.log(`บันทึก Credit7D สะสม ${credit7DRaw.length} รายการ`);
+    });
+  }
+
+  // บันทึก Credit15D สะสมรายวัน
+  if (credit15DRaw.length > 0) {
+    saveAccumulateCredit(credit15DRaw, 'Credit15D').then(() => {
+      console.log(`บันทึก Credit15D สะสม ${credit15DRaw.length} รายการ`);
+    });
+  }
+
+  // อัปเดต badge เตือนว่ามีรายการสะสมรอเปิดบิล
+  const periodicCount = credit7DRaw.length + credit15DRaw.length;
+  const periodicBadge = document.getElementById('periodic-count');
+  if (periodicBadge) {
+    periodicBadge.style.display = periodicCount > 0 ? '' : 'none';
+    periodicBadge.textContent = '!';
   }
 
   state.bills = normalBills;
@@ -1584,7 +1671,171 @@ async function markPaid(blNo, carrier) {
   }
 }
 
-// ─── Overview page ────────────────────────────────────────────
+// ─── Periodic Bills Page (Credit7D/15D รวมรอบ) ───────────────
+async function renderPeriodic() {
+  const c = document.getElementById('main-content');
+  c.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:40px">
+    <div class="spinner"></div><div style="margin-top:12px;color:var(--text3)">กำลังดึงข้อมูลสะสม...</div>
+  </div></div>`;
+
+  try {
+    const [r7, r15] = await Promise.all([
+      fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulateCredit', creditType: 'Credit7D'  }))).then(r=>r.json()),
+      fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulateCredit', creditType: 'Credit15D' }))).then(r=>r.json()),
+    ]);
+    renderPeriodicUI(c, r7.rows || [], r15.rows || []);
+  } catch(e) {
+    c.innerHTML = `<div class="alert alert-amber">โหลดข้อมูลไม่ได้: ${e.message}</div>`;
+  }
+}
+
+function renderPeriodicUI(c, rows7d, rows15d) {
+  // รวมยอดต่อลูกค้าต่อ carrier
+  function groupRows(rows) {
+    const g = {};
+    rows.forEach(r => {
+      const key = `${r['Sub Account']}|${r['Carrier']}`;
+      if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], freight:0, cod:0, total:0, dates:[] };
+      g[key].freight += parseFloat(r['Freight']||0);
+      g[key].cod     += parseFloat(r['COD']||0);
+      g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
+      if (r['วันที่รับงาน']) g[key].dates.push(r['วันที่รับงาน']);
+    });
+    return Object.values(g);
+  }
+
+  const grouped7d  = groupRows(rows7d);
+  const grouped15d = groupRows(rows15d);
+  const isMonday   = new Date().getDay() === 1;
+  const is1or16    = [1,16].includes(new Date().getDate());
+
+  function renderTable(grouped, creditType, isRoundDay) {
+    if (grouped.length === 0) return `<div class="empty" style="padding:20px">ไม่มีข้อมูลสะสม ${creditType}</div>`;
+    const banner = !isRoundDay
+      ? `<div class="alert alert-amber" style="margin-bottom:12px">
+          <svg class="alert-icon" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="#92400e"/><path d="M7 4v4M7 10v.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <div><strong>ไม่ใช่รอบปกติ</strong> — กรุณาตรวจสอบยอดให้ถูกต้องก่อนเปิดบิล</div>
+        </div>` : '';
+    const rows = grouped.map((g,i) => {
+      const dateRange = g.dates.length > 0
+        ? g.dates.sort()[0] + ' – ' + g.dates.sort().at(-1)
+        : '-';
+      return `<tr>
+        <td><input type="checkbox" id="p-${creditType}-${i}" checked style="accent-color:var(--blue)"></td>
+        <td style="white-space:normal">
+          <div style="font-weight:600;font-size:12px">${g.flowName}</div>
+          <div style="font-size:11px;color:var(--text3)">${g.subAcc}</div>
+        </td>
+        <td><span class="badge badge-${g.carrier==='Flash'||g.carrier==='Flash WF'?'blue':g.carrier==='DHL'?'gray':'purple'}" style="font-size:10px">${g.carrier}</span></td>
+        <td style="font-size:11px;color:var(--text2)">${dateRange}</td>
+        <td class="right mono">฿${g.freight.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+        <td class="right mono">${g.cod > 0 ? '฿'+g.cod.toLocaleString('th-TH',{minimumFractionDigits:2}) : '–'}</td>
+        <td class="right mono" style="font-weight:700">฿${g.total.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+      </tr>`;
+    }).join('');
+    const totalAmt = grouped.reduce((s,g)=>s+g.total,0);
+    return `
+      ${banner}
+      <div class="tbl-wrap">
+        <table class="tbl" style="table-layout:auto;min-width:700px">
+          <thead><tr>
+            <th style="width:32px"></th>
+            <th style="min-width:200px">ลูกค้า</th>
+            <th style="width:90px">Carrier</th>
+            <th style="width:150px">รอบวันที่</th>
+            <th class="right" style="width:110px">Freight</th>
+            <th class="right" style="width:110px">COD</th>
+            <th class="right" style="width:120px">ยอดรวม VAT</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr style="font-weight:700;border-top:2px solid var(--border)">
+            <td colspan="6" style="padding:10px 12px">รวม ${grouped.length} รายการ</td>
+            <td class="right mono" style="padding:10px 12px">฿${totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding:12px 0 0">
+        <button class="btn btn-green" onclick="confirmPeriodicBills('${creditType}')">
+          เปิดบิล ${creditType} ใน Flowaccount →
+        </button>
+      </div>`;
+  }
+
+  c.innerHTML = `
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card">
+      <div class="card-hd"><div class="card-title">💳 Credit 7 วัน (รอบจันทร์)</div>
+        <span style="font-size:11px;color:var(--text3)">${rows7d.length} แถวสะสม</span>
+      </div>
+      <div class="card-body">${renderTable(grouped7d, 'Credit7D', isMonday)}</div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-title">💳 Credit 15 วัน (รอบวันที่ 1/16)</div>
+        <span style="font-size:11px;color:var(--text3)">${rows15d.length} แถวสะสม</span>
+      </div>
+      <div class="card-body">${renderTable(grouped15d, 'Credit15D', is1or16)}</div>
+    </div>
+  </div>`;
+}
+
+async function confirmPeriodicBills(creditType) {
+  // ดึงข้อมูลใหม่จาก Sheet แล้วเปิดบิล
+  const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulateCredit', creditType })));
+  const data = await resp.json();
+  if (!data.ok || !data.rows?.length) { alert('ไม่มีข้อมูลสะสม'); return; }
+
+  // groupRows
+  const g = {};
+  data.rows.forEach(r => {
+    const key = `${r['Sub Account']}|${r['Carrier']}`;
+    if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], type: creditType, freight:0, cod:0, total:0, dates:[] };
+    g[key].freight += parseFloat(r['Freight']||0);
+    g[key].cod     += parseFloat(r['COD']||0);
+    g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
+    if (r['วันที่รับงาน']) g[key].dates.push(r['วันที่รับงาน']);
+  });
+  const grouped = Object.values(g);
+  const totalAmt = grouped.reduce((s,g)=>s+g.total,0).toLocaleString('th-TH',{minimumFractionDigits:2});
+
+  if (!confirm(`ยืนยันเปิดบิล ${creditType} จำนวน ${grouped.length} ราย\nยอดรวม ฿${totalAmt}\n\nระบบจะเปิดบิลใน Flowaccount และล้างข้อมูลสะสม`)) return;
+
+  const selDate = new Date().toISOString().slice(0,10);
+  const results = [];
+  for (const bill of grouped) {
+    const dateRange = bill.dates.length > 0
+      ? `งานวันที่ ${bill.dates.sort()[0].replace(/\d{4}/,d=>parseInt(d)+543)} - ${bill.dates.sort().at(-1).replace(/\d{4}/,d=>parseInt(d)+543)}//${bill.carrier.replace(' WF','').replace(' GAP','')}`
+      : '';
+    const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
+      subAcc:    bill.subAcc,
+      flowName:  bill.flowName,
+      carrier:   bill.carrier,
+      type:      creditType,
+      dateRange: dateRange,
+      billDate:  selDate,
+      freight:   bill.freight,
+      cod:       bill.cod,
+      total:     bill.total,
+    }}));
+    try {
+      const r = await fetch(GAS_URL + '?data=' + payload).then(r=>r.json());
+      results.push({ name: bill.flowName, ok: r.ok, invNo: r.invNo, error: r.error });
+    } catch(e) {
+      results.push({ name: bill.flowName, ok: false, error: e.message });
+    }
+  }
+
+  const ok   = results.filter(r=>r.ok);
+  const fail = results.filter(r=>!r.ok);
+  let msg = `✅ เปิดบิลสำเร็จ ${ok.length} รายการ`;
+  if (fail.length) msg += `\n❌ ไม่สำเร็จ ${fail.length} รายการ:\n` + fail.map(r=>`• ${r.name}: ${r.error}`).join('\n');
+  alert(msg);
+
+  // ล้างข้อมูลสะสมหลังเปิดบิลครบ
+  if (ok.length > 0) {
+    await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'clearAccumulateCredit', creditType })));
+  }
+  renderPeriodic();
+}
 function renderOverview() {
   const bills = state.bills;
   const hasFiles = Object.keys(state.files).length > 0;
@@ -1804,6 +2055,7 @@ async function confirmBills() {
     const results = [];
     for (const bill of bills) {
       try {
+        console.log(`📤 ส่งเปิดบิล [${bill.subAcc}] remote=${bill.remote} freight=${bill.freight} paperPod=${bill.paperPod} cod=${bill.cod}`);
         const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill }));
         const resp = await fetch(GAS_URL + '?data=' + payload);
         const r    = await resp.json();
