@@ -1176,14 +1176,22 @@ function parseWefastDaily(sheets, targetDates) {
     const key  = `${acc}|${rowDate}`;
     if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, remote:0, tourist:0, returnFee:0, happy:0, pkg:0, total:0 };
     grouped[key].trackingCount += 1;
-    grouped[key].freight        += parseFloat(row[priceCol])     || 0;
-    grouped[key].total          += parseFloat(row[amtCol])       || 0;
-    grouped[key].cod            += parseFloat(row[codCol])       || 0;
-    grouped[key].insurance      += parseFloat(row[insuranceCol]) || 0;
-    grouped[key].boxShield      += parseFloat(row[boxShieldCol]) || 0;
-    grouped[key].remote         += parseFloat(row[remoteCol])    || 0;
-    grouped[key].tourist        += parseFloat(row[touristCol])   || 0;
-    grouped[key].returnFee      += parseFloat(row[returnFeeCol]) || 0;
+    const _freight   = parseFloat(row[priceCol])     || 0;
+    const _remote    = parseFloat(row[remoteCol])    || 0;
+    const _tourist   = parseFloat(row[touristCol])   || 0;
+    const _returnFee = parseFloat(row[returnFeeCol]) || 0;
+    const _insurance = parseFloat(row[insuranceCol]) || 0;
+    const _boxShield = parseFloat(row[boxShieldCol]) || 0;
+    const _cod       = parseFloat(row[codCol])       || 0;
+    grouped[key].freight   += _freight;
+    grouped[key].remote    += _remote;
+    grouped[key].tourist   += _tourist;
+    grouped[key].returnFee += _returnFee;
+    grouped[key].insurance += _insurance;
+    grouped[key].boxShield += _boxShield;
+    grouped[key].cod       += _cod;
+    // คำนวณ total เองแทนอ่านจาก formula col ที่ XLSX.js อ่านไม่ได้
+    grouped[key].total += _freight + _remote + _tourist + _returnFee + _insurance + _boxShield;
   }
   Object.values(grouped).forEach(b => {
     b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
