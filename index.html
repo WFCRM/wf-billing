@@ -936,6 +936,9 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   // Debug: แสดง col indices ที่ detect ได้
   console.log(`[Flash parser] dateCol=${dateCol} accCol=${accCol} freightCol=${freightCol} codCol=${codCol} flashCareCol=${flashCareCol}`);
   console.log(`[Flash headers sample]`, headers.slice(28,35).map((h,i)=>`[${i+28}]=${JSON.stringify(h)}`).join(' '));
+  // debug: ดู row แรกที่ match date
+  const _dbgRow = rows.slice(1).find(r => { const d = extractFlashDate(r); return d && targetDates.includes(d); });
+  if (_dbgRow) console.log(`[Flash row sample] len=${_dbgRow.length} col30=${JSON.stringify(_dbgRow[30])} col31=${JSON.stringify(_dbgRow[31])} accCol=${JSON.stringify(_dbgRow[accCol])}`);
 
   // Flash col 0 (Date) อาจเป็น formula =IFERROR(LEFT(C2,11),0)
   // ถ้าอ่านไม่ได้ให้ fallback ใช้ col 2 (PU time) ที่มี timestamp จริง
