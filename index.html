@@ -933,6 +933,10 @@ function parseFlashDaily(sheets, carrier, targetDates) {
 
   if (dateCol < 0 || accCol < 0) return parseFlashPivot(sheets, carrier);
 
+  // Debug: แสดง col indices ที่ detect ได้
+  console.log(`[Flash parser] dateCol=${dateCol} accCol=${accCol} freightCol=${freightCol} codCol=${codCol} flashCareCol=${flashCareCol}`);
+  console.log(`[Flash headers sample]`, headers.slice(28,35).map((h,i)=>`[${i+28}]=${JSON.stringify(h)}`).join(' '));
+
   // Flash col 0 (Date) อาจเป็น formula =IFERROR(LEFT(C2,11),0)
   // ถ้าอ่านไม่ได้ให้ fallback ใช้ col 2 (PU time) ที่มี timestamp จริง
   const puTimeCol = 2; // col C = PU time = "2026-04-29 17:11:32"
