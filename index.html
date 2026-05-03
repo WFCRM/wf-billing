@@ -684,6 +684,19 @@ function handleCustomerFile(evt) {
 }
 
 
+function removeFile(key) {
+  delete state.files[key];
+  // reset input
+  const input = document.getElementById('file-' + key);
+  if (input) input.value = '';
+  // reset bills ถ้าไม่มีไฟล์เลย
+  if (Object.keys(state.files).length === 0) {
+    state.bills = [];
+    state.selectedBills = new Set();
+  }
+  render();
+}
+
 function init() {
   const now = new Date();
   const dateStr = `${now.getDate()} ${MONTHS_TH[now.getMonth()]} ${now.getFullYear()} (วัน${DAYS_TH[now.getDay()]})`;
@@ -815,13 +828,19 @@ function renderUpload() {
     const loaded = state.files[f.key];
     const cls = loaded ? 'done' : (!f.required ? 'missing' : '');
     return `
-    <label class="upload-zone ${cls}" for="file-${f.key}" onclick="">
-      <input type="file" id="file-${f.key}" accept=".xlsx,.xls" onchange="handleFile(event,'${f.key}')">
-      <div class="uz-icon">${loaded ? '📗' : '📂'}</div>
-      <div class="uz-name">${f.label}</div>
-      <div class="uz-sub">${loaded ? loaded.name : (f.required ? 'คลิกเพื่ออัปโหลด' : 'ไม่มีทุกวัน')}</div>
-      ${loaded ? `<div class="uz-check"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2 2L7.5 2" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ''}
-    </label>`;
+    <div style="position:relative">
+      <label class="upload-zone ${cls}" for="file-${f.key}" onclick="">
+        <input type="file" id="file-${f.key}" accept=".xlsx,.xls" onchange="handleFile(event,'${f.key}')">
+        <div class="uz-icon">${loaded ? '📗' : '📂'}</div>
+        <div class="uz-name">${f.label}</div>
+        <div class="uz-sub">${loaded ? loaded.name : (f.required ? 'คลิกเพื่ออัปโหลด' : 'ไม่มีทุกวัน')}</div>
+        ${loaded ? `<div class="uz-check"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2 2L7.5 2" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ''}
+      </label>
+      ${loaded ? `<button onclick="removeFile('${f.key}');event.preventDefault();event.stopPropagation();"
+        style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;
+        background:var(--red);color:#fff;border:none;cursor:pointer;font-size:12px;
+        display:flex;align-items:center;justify-content:center;z-index:10;padding:0;line-height:1">✕</button>` : ''}
+    </div>`;
   }).join('');
 
   const steps = [
@@ -1776,12 +1795,13 @@ async function renderTracking() {
     if (!data.ok) throw new Error(data.error);
 
     const rows = data.rows || [];
+    window._trackingRows = rows; // เก็บไว้สำหรับ Export Excel
     const pending = rows.filter(r => r['สถานะ'] === 'รอชำระ');
     const paid    = rows.filter(r => r['สถานะ'] === 'ชำระแล้ว');
     const overdue = pending.filter(r => r['วันครบกำหนด'] && isOverdueDate(r['วันครบกำหนด']));
 
     const tabs = ['Flash','DHL','WefastD','SPX'].map(n =>
-      `<div class="tab ${n===carrier?'active':''}" onclick="state.trackingCarrier='${n}';renderTracking()">${n}</div>`
+      `<div class="tab ${n===carrier?'active':''}" data-carrier="${n}" onclick="state.trackingCarrier='${n}';renderTracking()">${n}</div>`
     ).join('');
 
     const rowsHtml = rows.length === 0
@@ -1814,6 +1834,9 @@ async function renderTracking() {
       <div></div>
       <button class="btn btn-sm" onclick="syncFlowaccount(this)" style="font-size:11px">
         🔄 Sync จาก Flowaccount
+      </button>
+      <button class="btn btn-sm" onclick="exportTrackingExcel()" style="font-size:11px;background:var(--green);color:#fff">
+        📥 Export Excel
       </button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
@@ -2499,6 +2522,39 @@ function filterByType(type) {
     state.bills.filter(b => b.type === type).forEach(b => state.selectedBills.add(b.id));
   }
   render();
+}
+
+function exportTrackingExcel() {
+  // ดึงข้อมูลจาก tracking table ที่แสดงอยู่
+  const activeTab = document.querySelector('.tab-btn.active');
+  const carrier = activeTab ? activeTab.dataset.carrier : 'Flash';
+  const rows = window._trackingRows || [];
+  if (!rows.length) { alert('ไม่มีข้อมูลในตาราง'); return; }
+
+  const data = rows.map(r => ({
+    'วันที่วางบิล':   r['วันที่วางบิล'] || '',
+    'Sub Account':     r['Sub Account'] || '',
+    'ชื่อลูกค้า':      r['ชื่อลูกค้า (Flowaccount)'] || '',
+    'Carrier':         r['Carrier'] || '',
+    'ประเภท':          r['ประเภท'] || '',
+    'รอบวันที่':        r['รอบวันที่'] || '',
+    'จำนวนชิ้น':       r['จำนวนชิ้น'] || 0,
+    'Freight':         r['Freight'] || 0,
+    'COD':             r['COD'] || 0,
+    'ยอดรวม VAT':      r['ยอดรวม VAT'] || 0,
+    'BL No.':          r['BL No. (Flowaccount)'] || '',
+    'Inv No.':         r['Inv No. (ใบกำกับ)'] || '',
+    'วันครบกำหนด':     r['วันครบกำหนด'] || '',
+    'วันที่ชำระ':       r['วันที่ชำระ'] || '',
+    'ยอดที่ชำระ':       r['ยอดที่ชำระ'] || '',
+    'หัก ณ ที่จ่าย':   r['หัก ณ ที่จ่าย'] || '',
+    'สถานะ':           r['สถานะ'] || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, carrier);
+  XLSX.writeFile(wb, `WF_Tracking_${carrier}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 function exportExcel() {
