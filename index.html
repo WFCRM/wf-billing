@@ -1227,7 +1227,8 @@ function parseSPXDaily(sheets, targetDates) {
   const freightCol = headers.findIndex(h => /^freight\s*$/i.test(String(h).trim()));
   const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()) && !String(h).toLowerCase().includes('amt'));
   const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
-  const totalCol   = headers.findIndex(h => String(h).includes('Total+Vat') || String(h).includes('Total รวม Vat'));
+  const totalCol      = headers.findIndex(h => String(h).includes('Total+Vat') || String(h).includes('Total รวม Vat'));
+  const returnFeeCol  = headers.findIndex(h => String(h).trim() === 'ค่าตีกลับ' || /return.*fee/i.test(String(h)));
   if (accCol < 0) return [];
 
   // helper: date จาก cell (เหมือน Flash)
@@ -1252,13 +1253,21 @@ function parseSPXDaily(sheets, targetDates) {
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
     const key = `${acc}|${rowDate}`;
-    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, pkg:0, total:0 };
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, returnFee:0, pkg:0, total:0 };
     grouped[key].trackingCount += 1;
     grouped[key].freight += parseFloat(row[freightCol]) || 0;
     grouped[key].cod     += parseFloat(row[codCol])     || 0;
-    grouped[key].remote  += parseFloat(row[remoteCol])  || 0;
-    grouped[key].total   += parseFloat(row[totalCol])   || 0;
+    grouped[key].remote    += parseFloat(row[remoteCol])    || 0;
+    grouped[key].returnFee += returnFeeCol >= 0 ? parseFloat(row[returnFeeCol]) || 0 : 0;
+    grouped[key].total     += parseFloat(row[totalCol])     || 0;
   }
+  // ถ้า total มาจาก formula col ที่ XLSX.js อ่านไม่ได้ ให้คำนวณเอง
+  Object.values(grouped).forEach(b => {
+    if (b.total === 0 && (b.freight > 0 || b.remote > 0 || b.returnFee > 0)) {
+      const vatBase = b.cod;
+      b.total = parseFloat((b.freight + b.remote + b.returnFee + vatBase + (vatBase * 0.07)).toFixed(2));
+    }
+  });
   return Object.values(grouped).filter(b => b.total > 0 || b.freight > 0);
 }
 
@@ -1455,6 +1464,7 @@ function calculateBills() {
       boxShield:     b.boxShield  || 0,
       paperPod:      b.paperPod   || 0,
       insurance:     b.insurance  || 0,
+      returnFee:     b.returnFee  || 0,
       amDeliv:       b.amDeliv    || 0,
       ontime:        b.ontime     || 0,
       pickup:        b.pickup     || 0,
