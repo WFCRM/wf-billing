@@ -776,7 +776,7 @@ function showPage(page, el) {
     overview:  ['ภาพรวม','สถานะการเปิดบิลประจำวัน'],
     upload:    ['อัปโหลดไฟล์รายงาน','เลือกไฟล์จาก Admin แล้วระบบจะคำนวณรายการที่ต้องเปิดบิลให้อัตโนมัติ'],
     bills:     ['รายการเปิดบิลวันนี้','คำนวณจากไฟล์ที่อัปโหลด แยกตามประเภทลูกค้า'],
-    periodic:  ['เปิดบิลรวมรอบ','ดึงยอดสะสม Credit7D / Credit15D จาก Sheet มาเปิดบิล'],
+    periodic:  ['เปิดบิลรวมรอบ','ดึงยอดสะสม Credit7D / Credit15D / เปิดบิลรวม จาก Sheet มาเปิดบิล'],
     tracking:  ['ติดตามค้างชำระ','สถานะการชำระเงินของลูกค้าทั้งหมด'],
     customers: ['ข้อมูลลูกค้า','อัปโหลดไฟล์ data ลค. เพื่อกำหนดประเภทการเปิดบิล'],
   };
@@ -1868,12 +1868,12 @@ function applyPeriodicFilter() {
   const to   = document.getElementById('periodic-to')?.value;
   const rows7d  = window._periodicRows7d  || [];
   const rows15d = window._periodicRows15d || [];
+  const rowsAcc = window._periodicRowsAcc || [];
 
   function filterRows(rows) {
     if (!from && !to) return rows;
     return rows.filter(r => {
       const d = String(r['วันที่รับงาน'] || '').trim();
-      // แปลง dd/MM/yyyy → YYYY-MM-DD
       let dateISO = d;
       const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (m) dateISO = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
@@ -1884,7 +1884,7 @@ function applyPeriodicFilter() {
   }
 
   const c = document.getElementById('main-content');
-  renderPeriodicUI(c, filterRows(rows7d), filterRows(rows15d));
+  renderPeriodicUI(c, filterRows(rows7d), filterRows(rows15d), filterRows(rowsAcc));
   // restore date inputs หลัง re-render
   if (from) document.getElementById('periodic-from').value = from;
   if (to)   document.getElementById('periodic-to').value   = to;
@@ -1892,7 +1892,7 @@ function applyPeriodicFilter() {
 
 function clearPeriodicFilter() {
   const c = document.getElementById('main-content');
-  renderPeriodicUI(c, window._periodicRows7d || [], window._periodicRows15d || []);
+  renderPeriodicUI(c, window._periodicRows7d || [], window._periodicRows15d || [], window._periodicRowsAcc || []);
 }
 
 async function renderPeriodic() {
@@ -1902,17 +1902,19 @@ async function renderPeriodic() {
   </div></div>`;
 
   try {
-    const [r7, r15] = await Promise.all([
+    const [r7, r15, rAcc] = await Promise.all([
       fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulateCredit', creditType: 'Credit7D'  }))).then(r=>r.json()),
       fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulateCredit', creditType: 'Credit15D' }))).then(r=>r.json()),
+      fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulate' }))).then(r=>r.json()),
     ]);
-    renderPeriodicUI(c, r7.rows || [], r15.rows || []);
+    renderPeriodicUI(c, r7.rows || [], r15.rows || [], rAcc.rows || []);
   } catch(e) {
     c.innerHTML = `<div class="alert alert-amber">โหลดข้อมูลไม่ได้: ${e.message}</div>`;
   }
 }
 
-function renderPeriodicUI(c, rows7d, rows15d) {
+function renderPeriodicUI(c, rows7d, rows15d, rowsAcc) {
+  rowsAcc = rowsAcc || [];
   // รวมยอดต่อลูกค้าต่อ carrier
   function groupRows(rows) {
     const g = {};
@@ -1987,6 +1989,7 @@ function renderPeriodicUI(c, rows7d, rows15d) {
 
   window._periodicRows7d  = rows7d;
   window._periodicRows15d = rows15d;
+  window._periodicRowsAcc = rowsAcc;
 
   c.innerHTML = `
   <div style="display:flex;flex-direction:column;gap:20px">
@@ -2012,7 +2015,169 @@ function renderPeriodicUI(c, rows7d, rows15d) {
       </div>
       <div class="card-body">${renderTable(grouped15d, 'Credit15D', is1or16)}</div>
     </div>
+    ${renderAccumulateSection(rowsAcc)}
   </div>`;
+}
+
+// ─── Accumulate (Credit30D/เปิดบิลรวม) Section ───────────────
+function renderAccumulateSection(rowsAcc) {
+  // groupRows by subAcc+carrier
+  const g = {};
+  rowsAcc.forEach(r => {
+    const key = `${r['Sub Account']}|${r['Carrier']}`;
+    if (!g[key]) g[key] = {
+      subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'],
+      carrier: r['Carrier'], trackingCount:0,
+      freight:0, cod:0, remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
+      total:0, dateRange: r['รอบวันที่'] || '', dates:[]
+    };
+    g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
+    g[key].freight    += parseFloat(r['Freight']||0);
+    g[key].cod        += parseFloat(r['COD']||0);
+    g[key].remote     += parseFloat(r['Remote']||0);
+    g[key].tourist    += parseFloat(r['Tourist']||0);
+    g[key].returnFee  += parseFloat(r['ReturnFee']||0);
+    g[key].ontime     += parseFloat(r['Ontime']||0);
+    g[key].pickup     += parseFloat(r['Pickup']||0);
+    g[key].total      += parseFloat(r['ยอดรวม VAT']||0);
+    if (r['วันที่รับงาน']) g[key].dates.push(r['วันที่รับงาน']);
+  });
+  const grouped = Object.values(g);
+  const totalAmt = grouped.reduce((s,b) => s+b.total, 0);
+
+  const rows = grouped.map(b => `
+    <tr>
+      <td><div style="font-weight:600;font-size:12px">${b.flowName}</div>
+          <div style="font-size:10px;color:var(--text3)">${b.subAcc}</div></td>
+      <td><span class="badge badge-${b.carrier.includes('Flash')?'blue':b.carrier.includes('DHL')?'gray':b.carrier.includes('Wefast')?'purple':'amber'}" style="font-size:10px">${b.carrier.replace(' WF','').replace(' GAP','')}</span></td>
+      <td class="right mono" style="font-size:12px">${b.trackingCount}</td>
+      <td class="right mono" style="font-size:12px">฿${b.freight.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+      <td class="right mono" style="font-size:12px">${b.remote>0?'฿'+b.remote.toLocaleString('th-TH',{minimumFractionDigits:2}):'-'}</td>
+      <td class="right mono" style="font-size:12px">${b.returnFee>0?'฿'+b.returnFee.toLocaleString('th-TH',{minimumFractionDigits:2}):'-'}</td>
+      <td class="right mono" style="font-size:12px;font-weight:600;color:var(--text)">฿${b.total.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+    </tr>`).join('');
+
+  return `
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-title">📦 เปิดบิลรวม (Credit30D/สิ้นเดือน)</div>
+        <span style="font-size:11px;color:var(--text3)">${rowsAcc.length} แถวสะสม</span>
+      </div>
+      <div class="card-body">
+        ${grouped.length === 0
+          ? '<div class="empty" style="padding:20px">ไม่มีข้อมูลสะสม เปิดบิลรวม</div>'
+          : `<table class="tbl" style="font-size:12px">
+              <thead><tr>
+                <th>ลูกค้า</th><th>Carrier</th><th class="right">ชิ้น</th>
+                <th class="right">Freight</th><th class="right">Remote</th>
+                <th class="right">ตีกลับ</th><th class="right">รวม VAT</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+              <tfoot><tr style="font-weight:600;border-top:2px solid var(--border)">
+                <td colspan="6">รวมทั้งหมด</td>
+                <td class="right mono">฿${totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+              </tr></tfoot>
+            </table>
+            <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end">
+              <button class="btn btn-green" onclick="confirmAccumulateBills()">
+                เปิดบิลรวม ${grouped.length} ราย ใน Flowaccount →
+              </button>
+            </div>`}
+      </div>
+    </div>`;
+}
+
+async function confirmAccumulateBills() {
+  const rowsAcc = window._periodicRowsAcc || [];
+  if (!rowsAcc.length) { alert('ไม่มีข้อมูลสะสม'); return; }
+
+  // group
+  const g = {};
+  rowsAcc.forEach(r => {
+    const key = `${r['Sub Account']}|${r['Carrier']}`;
+    if (!g[key]) g[key] = {
+      subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'],
+      carrier: r['Carrier'], type: 'เปิดบิลรวม',
+      trackingCount:0, freight:0, cod:0,
+      remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
+      total:0, dates:[]
+    };
+    g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
+    g[key].freight    += parseFloat(r['Freight']||0);
+    g[key].cod        += parseFloat(r['COD']||0);
+    g[key].remote     += parseFloat(r['Remote']||0);
+    g[key].tourist    += parseFloat(r['Tourist']||0);
+    g[key].returnFee  += parseFloat(r['ReturnFee']||0);
+    g[key].ontime     += parseFloat(r['Ontime']||0);
+    g[key].pickup     += parseFloat(r['Pickup']||0);
+    g[key].total      += parseFloat(r['ยอดรวม VAT']||0);
+    if (r['วันที่รับงาน']) g[key].dates.push(r['วันที่รับงาน']);
+  });
+  const grouped = Object.values(g);
+  const totalAmt = grouped.reduce((s,b)=>s+b.total,0).toLocaleString('th-TH',{minimumFractionDigits:2});
+
+  if (!await showConfirmModal(`ยืนยันเปิดบิลรวม ${grouped.length} ราย\nยอดรวม ฿${totalAmt}\n\nระบบจะเปิดบิลใน Flowaccount`)) return;
+
+  const selDate = new Date().toISOString().slice(0,10);
+  const results = [];
+  for (const bill of grouped) {
+    const sortedDates = bill.dates.slice().sort();
+    const fmtD = (s) => {
+      const p1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const p2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (p1) return `${p1[1].padStart(2,'0')}/${p1[2].padStart(2,'0')}/${p1[3]}`;
+      if (p2) return `${p2[3]}/${p2[2]}/${p2[1]}`;
+      return s;
+    };
+    const fmtDTH = (s) => {
+      const p1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const p2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (p1) return `${p1[1].padStart(2,'0')}/${p1[2].padStart(2,'0')}/${parseInt(p1[3])+543}`;
+      if (p2) return `${p2[3]}/${p2[2]}/${parseInt(p2[1])+543}`;
+      return s;
+    };
+    const carrier_short = bill.carrier.replace(' WF','').replace(' GAP','');
+    const dateRange = sortedDates.length > 0
+      ? `งานวันที่ ${fmtDTH(sortedDates[0])} - ${fmtDTH(sortedDates[sortedDates.length-1])}//${carrier_short}`
+      : '';
+    const sheetPeriod = sortedDates.length > 0
+      ? `${fmtD(sortedDates[0])}-${fmtD(sortedDates[sortedDates.length-1])}`
+      : '';
+
+    const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
+      subAcc:        bill.subAcc,
+      flowName:      bill.flowName,
+      carrier:       bill.carrier,
+      type:          'เปิดบิลรวม',
+      dateRange,
+      sheetPeriod,
+      fromPeriodic:  true,
+      billDate:      selDate,
+      trackingCount: bill.trackingCount || 0,
+      freight:       bill.freight    || 0,
+      cod:           bill.cod        || 0,
+      remote:        bill.remote     || 0,
+      tourist:       bill.tourist    || 0,
+      returnFee:     bill.returnFee  || 0,
+      ontime:        bill.ontime     || 0,
+      pickup:        bill.pickup     || 0,
+      total:         bill.total      || 0,
+    }}));
+    try {
+      const r = await fetch(GAS_URL + '?data=' + payload).then(r=>r.json());
+      results.push({ name: bill.flowName, ok: r.ok, invNo: r.invNo, error: r.error });
+    } catch(e) {
+      results.push({ name: bill.flowName, ok: false, error: e.message });
+    }
+  }
+
+  const ok   = results.filter(r=>r.ok);
+  const fail = results.filter(r=>!r.ok);
+  let msg = `✅ เปิดบิลสำเร็จ ${ok.length} รายการ`;
+  if (fail.length) msg += `\n❌ ไม่สำเร็จ ${fail.length} รายการ:\n` + fail.map(r=>`• ${r.name}: ${r.error}`).join('\n');
+  alert(msg);
+
+  renderPeriodic();
 }
 
 async function confirmPeriodicBills(creditType) {
