@@ -3,10 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>WhaleFast — เปิดบิลรายรับ v2.1</title>
+<title>WhaleFast — เปิดบิลรายรับ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -1130,20 +1127,22 @@ function parseWefastDaily(sheets, targetDates) {
   const headers = rows[0];
   console.log('WefastD headers:', headers.slice(0,15));
 
-  const dateCol      = headers.findIndex(h => /^date$/i.test(String(h).trim()) || String(h).includes('วันรับงาน') || String(h).includes('วันที่'));
+  // ใช้ col C (วันรับงาน) เพราะ col A (Date) เป็น formula ที่ XLSX.js อาจ evaluate ไม่ได้
+  const dateColA     = headers.findIndex(h => /^date$/i.test(String(h).trim()));
+  const dateColC     = headers.findIndex(h => String(h).trim() === 'วันรับงาน');
+  const dateCol      = dateColC >= 0 ? dateColC : dateColA;
   const accCol       = headers.findIndex(h => /^account$/i.test(String(h).trim()) || String(h).includes('Sub Account'));
   const nameCol      = headers.findIndex(h => /customer\s*name/i.test(String(h)) || String(h).includes('ชื่อลูกค้า'));
   const priceCol     = headers.findIndex(h => String(h).trim() === 'ราคา (บาท)');
-  const totalCol     = headers.findIndex(h => String(h).trim() === 'รวม');
-  const grandCol     = headers.findIndex(h => String(h).trim() === 'Grand Total');
-  const vatCol       = headers.findIndex(h => String(h).trim() === 'Vat7%');
   const codCol       = headers.findIndex(h => String(h).trim().startsWith('เก็บเงิน') || /^cod$/i.test(String(h).trim()));
   const insuranceCol = headers.findIndex(h => String(h).includes('ประกันสินค้า') || /^ประกันพัสดุ$/.test(String(h).trim()));
   const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)) || String(h).includes('ประกันกล่อง'));
   const remoteCol    = headers.findIndex(h => String(h).trim() === 'พื้นที่ห่างไกล');
   const touristCol   = headers.findIndex(h => String(h).includes('พื้นทีท่องเที่ยว') || String(h).includes('พื้นที่ท่องเที่ยว'));
   const returnFeeCol = headers.findIndex(h => String(h).trim() === 'ค่าตีกลับ');
-  const amtCol = grandCol >= 0 ? grandCol : (totalCol >= 0 ? totalCol : priceCol);
+  const ontimeCol    = headers.findIndex(h => /on.?time/i.test(String(h)));
+  const pickupCol    = headers.findIndex(h => String(h).includes('ค่าบริการเข้ารับ'));
+  console.log('WefastD cols: date='+dateCol+' acc='+accCol+' price='+priceCol+' remote='+remoteCol+' tourist='+touristCol+' returnFee='+returnFeeCol+' ontime='+ontimeCol+' pickup='+pickupCol);
 
   if (accCol < 0) { console.log('WefastD: ไม่พบ column Account'); return []; }
 
@@ -1177,24 +1176,28 @@ function parseWefastDaily(sheets, targetDates) {
     if (!wfdType || wfdType.includes('Internal') || wfdType.includes('ไม่เปิดบิล')) continue;
     const name = String(row[nameCol] || acc).trim();
     const key  = `${acc}|${rowDate}`;
-    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, remote:0, tourist:0, returnFee:0, happy:0, pkg:0, total:0 };
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'WefastD', billDate: rowDate, trackingCount:0, freight:0, cod:0, insurance:0, boxShield:0, remote:0, tourist:0, returnFee:0, ontime:0, pickup:0, happy:0, pkg:0, total:0 };
     grouped[key].trackingCount += 1;
-    const _freight   = parseFloat(row[priceCol])     || 0;
-    const _remote    = parseFloat(row[remoteCol])    || 0;
-    const _tourist   = parseFloat(row[touristCol])   || 0;
-    const _returnFee = parseFloat(row[returnFeeCol]) || 0;
-    const _insurance = parseFloat(row[insuranceCol]) || 0;
-    const _boxShield = parseFloat(row[boxShieldCol]) || 0;
-    const _cod       = parseFloat(row[codCol])       || 0;
+    const _freight   = parseFloat(row[priceCol])                          || 0;
+    const _remote    = remoteCol    >= 0 ? parseFloat(row[remoteCol])    || 0 : 0;
+    const _tourist   = touristCol   >= 0 ? parseFloat(row[touristCol])   || 0 : 0;
+    const _returnFee = returnFeeCol >= 0 ? parseFloat(row[returnFeeCol]) || 0 : 0;
+    const _insurance = insuranceCol >= 0 ? parseFloat(row[insuranceCol]) || 0 : 0;
+    const _boxShield = boxShieldCol >= 0 ? parseFloat(row[boxShieldCol]) || 0 : 0;
+    const _ontime    = ontimeCol    >= 0 ? parseFloat(row[ontimeCol])    || 0 : 0;
+    const _pickup    = pickupCol    >= 0 ? parseFloat(row[pickupCol])    || 0 : 0;
+    const _cod       = codCol       >= 0 ? parseFloat(row[codCol])       || 0 : 0;
     grouped[key].freight   += _freight;
     grouped[key].remote    += _remote;
     grouped[key].tourist   += _tourist;
     grouped[key].returnFee += _returnFee;
     grouped[key].insurance += _insurance;
     grouped[key].boxShield += _boxShield;
+    grouped[key].ontime    += _ontime;
+    grouped[key].pickup    += _pickup;
     grouped[key].cod       += _cod;
     // คำนวณ total เองแทนอ่านจาก formula col ที่ XLSX.js อ่านไม่ได้
-    grouped[key].total += _freight + _remote + _tourist + _returnFee + _insurance + _boxShield;
+    grouped[key].total += _freight + _remote + _tourist + _returnFee + _insurance + _boxShield + _ontime + _pickup;
   }
   Object.values(grouped).forEach(b => {
     b.insuranceVat = b.insurance > 0 ? parseFloat((b.insurance * VAT_RATE).toFixed(2)) : 0;
@@ -1448,6 +1451,8 @@ function calculateBills() {
       paperPod:      b.paperPod   || 0,
       insurance:     b.insurance  || 0,
       amDeliv:       b.amDeliv    || 0,
+      ontime:        b.ontime     || 0,
+      pickup:        b.pickup     || 0,
       total:         b.total,
       dateRange:     b.billDate
         ? new Date(b.billDate).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'})
@@ -1558,6 +1563,9 @@ function buildLineItems(b) {
   if ((b.paperPod  || 0) > 0) items.push({ label:'Paper POD Fee',                  amount: b.paperPod,  vat: true  });
   if ((b.insurance || 0) > 0) items.push({ label:'ค่าประกันสินค้า',                amount: b.insurance, vat: true  });
   if ((b.amDeliv   || 0) > 0) items.push({ label:'AM Delivery',                    amount: b.amDeliv,   vat: true  });
+  // WefastD
+  if ((b.ontime    || 0) > 0) items.push({ label:'On-time Delivery',               amount: b.ontime,    vat: false });
+  if ((b.pickup    || 0) > 0) items.push({ label:'ค่าบริการเข้ารับ',              amount: b.pickup,    vat: false });
   return items;
 }
 function buildLineItemsFromBill(b) {
@@ -1990,8 +1998,7 @@ async function confirmPeriodicBills(creditType) {
   const g = {};
   data.rows.forEach(r => {
     const key = `${r['Sub Account']}|${r['Carrier']}`;
-    if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], type: creditType, trackingCount:0, freight:0, cod:0, total:0, dates:[] };
-    g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
+    if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], type: creditType, freight:0, cod:0, total:0, dates:[] };
     g[key].freight += parseFloat(r['Freight']||0);
     g[key].cod     += parseFloat(r['COD']||0);
     g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
@@ -2005,20 +2012,8 @@ async function confirmPeriodicBills(creditType) {
   const selDate = new Date().toISOString().slice(0,10);
   const results = [];
   for (const bill of grouped) {
-    const sortedDates = bill.dates.slice().sort();
-    const fmtD = (iso) => {
-      // iso อาจเป็น dd/MM/yyyy หรือ YYYY-MM-DD
-      let d, m, y;
-      const p1 = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      const p2 = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (p1) { [,d,m,y] = p1; }
-      else if (p2) { [,y,m,d] = p2; }
-      else return iso;
-      return `${d}/${m}/${parseInt(y)+543}`;
-    };
-    const carrier_short = bill.carrier.replace(' WF','').replace(' GAP','');
-    const dateRange = sortedDates.length > 0
-      ? `งานวันที่ ${fmtD(sortedDates[0])} - ${fmtD(sortedDates[sortedDates.length-1])}//${carrier_short}`
+    const dateRange = bill.dates.length > 0
+      ? `งานวันที่ ${bill.dates.sort()[0].replace(/\d{4}/,d=>parseInt(d)+543)} - ${bill.dates.sort().at(-1).replace(/\d{4}/,d=>parseInt(d)+543)}//${bill.carrier.replace(' WF','').replace(' GAP','')}`
       : '';
     const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
       subAcc:        bill.subAcc,
@@ -2258,6 +2253,8 @@ async function confirmBills() {
     paperPod:      parseFloat(b.paperPod)  || 0,
     insurance:     parseFloat(b.insurance) || 0,
     amDeliv:       parseFloat(b.amDeliv)   || 0,
+    ontime:        parseFloat(b.ontime)    || 0,
+    pickup:        parseFloat(b.pickup)    || 0,
     total:         parseFloat(b.total)     || 0,
     noReceipt:     b.noReceipt || false,
   }));
