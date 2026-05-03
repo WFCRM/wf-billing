@@ -2116,7 +2116,30 @@ async function confirmAccumulateBills() {
   const grouped = Object.values(g);
   const totalAmt = grouped.reduce((s,b)=>s+b.total,0).toLocaleString('th-TH',{minimumFractionDigits:2});
 
-  if (!await showConfirmModal(`ยืนยันเปิดบิลรวม ${grouped.length} ราย\nยอดรวม ฿${totalAmt}\n\nระบบจะเปิดบิลใน Flowaccount`)) return;
+  // ─── Check duplicate ───────────────────────────────────────
+  const thisMonth = new Date().toISOString().slice(0,7); // YYYY-MM
+  let dupWarning = '';
+  try {
+    const dupChecks = await Promise.all(grouped.map(async b => {
+      const p = encodeURIComponent(JSON.stringify({
+        action: 'checkDuplicate',
+        subAcc:  b.subAcc,
+        carrier: b.carrier,
+        billType: 'เปิดบิลรวม',
+        month:   thisMonth,
+      }));
+      const r = await fetch(GAS_URL + '?data=' + p).then(r=>r.json());
+      return { name: b.flowName, subAcc: b.subAcc, duplicate: r.duplicate, blNo: r.blNo };
+    }));
+    const dups = dupChecks.filter(d => d.duplicate);
+    if (dups.length > 0) {
+      dupWarning = `\n\n⚠️ พบรายการที่เปิดบิลเดือนนี้ไปแล้ว:\n` +
+        dups.map(d => `• ${d.name} (${d.subAcc}) — BL: ${d.blNo||'?'}`).join('\n') +
+        `\n\nต้องการเปิดซ้ำหรือไม่?`;
+    }
+  } catch(e) { console.log('dup check error:', e); }
+
+  if (!await showConfirmModal(`ยืนยันเปิดบิลรวม ${grouped.length} ราย\nยอดรวม ฿${totalAmt}\n\nระบบจะเปิดบิลใน Flowaccount${dupWarning}`)) return;
 
   const selDate = new Date().toISOString().slice(0,10);
   const results = [];
