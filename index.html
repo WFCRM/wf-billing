@@ -392,6 +392,7 @@ const FILES_CONFIG = [
   { key:'flash_gap', label:'Flash GAP',  sub:'CAZ3461',    color:'badge-blue',   required:true  },
   { key:'dhl',       label:'DHL',        sub:'DHL accounts',color:'badge-gray',  required:true  },
   { key:'wefast',    label:'WefastD',    sub:'WF accounts', color:'badge-purple',required:true  },
+  { key:'flash_gap', label:'Flash GAP',  sub:'CAZ accounts', color:'badge-green', required:false },
   { key:'spx',       label:'SPX',        sub:'SPX accounts',color:'badge-amber', required:false },
 ];
 
@@ -1426,9 +1427,17 @@ function calculateBills() {
   const credit7DRaw     = []; // Credit7D สะสมรายวัน
   const credit15DRaw    = []; // Credit15D สะสมรายวัน
 
+  const gapRaw = []; // Flash GAP — บันทึกลง Sheet เท่านั้น
+
   for (const b of rawBills) {
     const custType = b.overrideType || lookupType(b.acc, b.name) || '';
     if (SKIP_TYPES.some(s => custType.includes(s))) continue;
+
+    // ─── Flash GAP: subAcc ขึ้นต้น CAZ → แยกออก ไม่แสดงในหน้ารายการ
+    if (String(b.acc || '').startsWith('CAZ')) {
+      gapRaw.push({ ...b, type: custType || 'เงินสด' });
+      continue;
+    }
 
     if (isAccumulateType(custType)) {
       accumulateRaw.push({ ...b, type: custType });
@@ -1550,6 +1559,45 @@ function calculateBills() {
     // แจ้งผล
     const names = accumulateRaw.map(b => `• ${getFlowName(b.acc)} (${b.acc})`).join('\n');
     alert(`📋 บันทึกลูกค้าเปิดบิลรวม ${accumulateRaw.length} รายการลง Sheet แล้ว\n\n${names}\n\nยอดรวมจะถูกเปิดบิลสิ้นเดือน`);
+  }
+
+  // ─── บันทึก Flash GAP ลง Sheet ───────────────────────────────
+  if (gapRaw.length > 0) {
+    const selDate = document.getElementById('bill-date')?.value || new Date().toISOString().slice(0,10);
+    const gapPayload = gapRaw.map(b => ({
+      subAcc:        b.acc,
+      flowName:      getFlowName(b.acc) || b.name,
+      carrier:       'Flash GAP',
+      type:          b.type || 'เงินสด',
+      billDate:      b.billDate || selDate,
+      dateRange:     b.billDate
+        ? (() => { const d=new Date(b.billDate); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })()
+        : getDateRange(),
+      trackingCount: b.trackingCount || 0,
+      freight:       parseFloat(b.freight)   || 0,
+      cod:           parseFloat(b.cod)        || 0,
+      happy:         parseFloat(b.happy)      || 0,
+      remote:        parseFloat(b.remote)     || 0,
+      tourist:       parseFloat(b.tourist)    || 0,
+      returnFee:     parseFloat(b.returnFee)  || 0,
+      ontime:        parseFloat(b.ontime)     || 0,
+      pkg:           parseFloat(b.pkg)        || 0,
+      flashCare:     parseFloat(b.flashCare)  || 0,
+      boxShield:     parseFloat(b.boxShield)  || 0,
+      insurance:     parseFloat(b.insurance)  || 0,
+      total:         parseFloat((parseFloat(b.total)||0).toFixed(2)),
+      noReceipt:     false,
+    }));
+    const CHUNK = 5;
+    for (let i = 0; i < gapPayload.length; i += CHUNK) {
+      const chunk = gapPayload.slice(i, i + CHUNK);
+      const p = encodeURIComponent(JSON.stringify({ action: 'saveGAP', bills: chunk }));
+      fetch(GAS_URL + '?data=' + p)
+        .then(r => r.json())
+        .then(d => console.log('saveGAP:', d.saved, 'rows'))
+        .catch(e => console.log('saveGAP error:', e));
+    }
+    console.log('บันทึก Flash GAP', gapRaw.length, 'รายการ');
   }
 
   // บันทึก Credit7D สะสมรายวัน (เฉพาะวันที่ไม่ใช่รอบเปิดบิล)
