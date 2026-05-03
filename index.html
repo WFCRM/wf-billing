@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WhaleFast — เปิดบิลรายรับ</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>WhaleFast — เปิดบิลรายรับ v2.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -1987,7 +1990,8 @@ async function confirmPeriodicBills(creditType) {
   const g = {};
   data.rows.forEach(r => {
     const key = `${r['Sub Account']}|${r['Carrier']}`;
-    if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], type: creditType, freight:0, cod:0, total:0, dates:[] };
+    if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], type: creditType, trackingCount:0, freight:0, cod:0, total:0, dates:[] };
+    g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
     g[key].freight += parseFloat(r['Freight']||0);
     g[key].cod     += parseFloat(r['COD']||0);
     g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
@@ -2001,8 +2005,20 @@ async function confirmPeriodicBills(creditType) {
   const selDate = new Date().toISOString().slice(0,10);
   const results = [];
   for (const bill of grouped) {
-    const dateRange = bill.dates.length > 0
-      ? `งานวันที่ ${bill.dates.sort()[0].replace(/\d{4}/,d=>parseInt(d)+543)} - ${bill.dates.sort().at(-1).replace(/\d{4}/,d=>parseInt(d)+543)}//${bill.carrier.replace(' WF','').replace(' GAP','')}`
+    const sortedDates = bill.dates.slice().sort();
+    const fmtD = (iso) => {
+      // iso อาจเป็น dd/MM/yyyy หรือ YYYY-MM-DD
+      let d, m, y;
+      const p1 = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const p2 = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (p1) { [,d,m,y] = p1; }
+      else if (p2) { [,y,m,d] = p2; }
+      else return iso;
+      return `${d}/${m}/${parseInt(y)+543}`;
+    };
+    const carrier_short = bill.carrier.replace(' WF','').replace(' GAP','');
+    const dateRange = sortedDates.length > 0
+      ? `งานวันที่ ${fmtD(sortedDates[0])} - ${fmtD(sortedDates[sortedDates.length-1])}//${carrier_short}`
       : '';
     const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
       subAcc:        bill.subAcc,
