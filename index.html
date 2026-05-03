@@ -1516,6 +1516,7 @@ function calculateBills() {
       carrier:       b.carrier,
       type:          b.type,
       dateRange:     getDateRange(),
+      sheetPeriod:   getDateRange(),
       billDate:      b.billDate || selDate,
       trackingCount: b.trackingCount || 0,
       freight:       parseFloat(b.freight)   || 0,
@@ -2050,15 +2051,42 @@ async function confirmPeriodicBills(creditType) {
   const selDate = new Date().toISOString().slice(0,10);
   const results = [];
   for (const bill of grouped) {
-    const dateRange = bill.dates.length > 0
-      ? `งานวันที่ ${bill.dates.sort()[0].replace(/\d{4}/,d=>parseInt(d)+543)} - ${bill.dates.sort().at(-1).replace(/\d{4}/,d=>parseInt(d)+543)}//${bill.carrier.replace(' WF','').replace(' GAP','')}`
+    const sortedDates = bill.dates.slice().sort();
+    const carrier_short = bill.carrier.replace(' WF','').replace(' GAP','');
+
+    // format date: dd/MM/yyyy (จาก dd/MM/yyyy หรือ YYYY-MM-DD)
+    const fmtDate = (s) => {
+      const p1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const p2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (p1) return `${p1[1].padStart(2,'0')}/${p1[2].padStart(2,'0')}/${p1[3]}`;
+      if (p2) return `${p2[3]}/${p2[2]}/${p2[1]}`;
+      return s;
+    };
+    const fmtDateTH = (s) => {
+      const p1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const p2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (p1) return `${p1[1].padStart(2,'0')}/${p1[2].padStart(2,'0')}/${parseInt(p1[3])+543}`;
+      if (p2) return `${p2[3]}/${p2[2]}/${parseInt(p2[1])+543}`;
+      return s;
+    };
+
+    // dateRange สำหรับ Flowaccount projectName (ปีพุทธ)
+    const dateRange = sortedDates.length > 0
+      ? `งานวันที่ ${fmtDateTH(sortedDates[0])} - ${fmtDateTH(sortedDates[sortedDates.length-1])}//${carrier_short}`
       : '';
+
+    // sheetPeriod สำหรับ Sheet col F (ปีค.ศ. ไม่มีเว้นวรรค)
+    const sheetPeriod = sortedDates.length > 0
+      ? `${fmtDate(sortedDates[0])}-${fmtDate(sortedDates[sortedDates.length-1])}`
+      : '';
+
     const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
       subAcc:        bill.subAcc,
       flowName:      bill.flowName,
       carrier:       bill.carrier,
       type:          creditType,
       dateRange:     dateRange,
+      sheetPeriod:   sheetPeriod,
       fromPeriodic:  true,
       billDate:      selDate,
       trackingCount: bill.trackingCount || 0,
@@ -2282,6 +2310,7 @@ async function confirmBills() {
     carrier:       b.carrier,
     type:          b.type,
     dateRange:     b.dateRange,
+    sheetPeriod:   b.billDate ? (() => { const d=new Date(b.billDate); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })() : '',
     billDate:      b.billDate || selDate,
     trackingCount: b.trackingCount || 0,
     freight:       parseFloat(b.freight)   || 0,
