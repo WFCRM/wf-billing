@@ -2129,6 +2129,7 @@ async function confirmAccumulateBills() {
         month:   thisMonth,
       }));
       const r = await fetch(GAS_URL + '?data=' + p).then(r=>r.json());
+      console.log('dupCheck:', b.subAcc, b.carrier, '→', r);
       return { name: b.flowName, subAcc: b.subAcc, duplicate: r.duplicate, blNo: r.blNo };
     }));
     const dups = dupChecks.filter(d => d.duplicate);
