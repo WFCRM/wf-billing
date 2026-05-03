@@ -945,6 +945,7 @@ function parseFlashDaily(sheets, carrier, targetDates) {
   const flashCareCol = headers.findIndex(h => /flash\s*care/i.test(String(h)) && !/flash\s*care\s*flash/i.test(String(h)));
   const boxShieldCol = headers.findIndex(h => /box\s*shield/i.test(String(h)) && !/box\s*shield\s*flash/i.test(String(h)));
   const returnFeeFlashCol = headers.findIndex(h => String(h).trim() === 'ค่าตีกลับ' || /return.*fee/i.test(String(h)));
+  const ontimeFlashCol    = headers.findIndex(h => /on.?time\s*delivery/i.test(String(h)) && !/flash/i.test(String(h)));
 
   if (dateCol < 0 || accCol < 0) return parseFlashPivot(sheets, carrier);
 
@@ -996,7 +997,7 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
     const key = `${acc}|${rowDateNorm}`; // แยก key ตามวันที่ → 2 วัน = 2 บิล
-    if (!grouped[key]) grouped[key] = { acc, name, carrier, billDate: rowDateNorm, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, returnFee:0, pkg:0, flashCare:0, boxShield:0, total:0 };
+    if (!grouped[key]) grouped[key] = { acc, name, carrier, billDate: rowDateNorm, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, returnFee:0, ontime:0, pkg:0, flashCare:0, boxShield:0, total:0 };
     const f = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
     grouped[key].trackingCount += 1;
     grouped[key].freight   += f(row[freightCol]);
@@ -1008,6 +1009,7 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     grouped[key].flashCare += f(row[flashCareCol]);
     grouped[key].boxShield += f(row[boxShieldCol]);
     grouped[key].returnFee += returnFeeFlashCol >= 0 ? f(row[returnFeeFlashCol]) : 0;
+    grouped[key].ontime    += ontimeFlashCol    >= 0 ? f(row[ontimeFlashCol])    : 0;
     grouped[key].total     += f(row[totalVatCol]);
   }
   // คำนวณ VAT สำหรับ COD, Flash Care, Box Shield
@@ -1015,7 +1017,7 @@ function parseFlashDaily(sheets, carrier, targetDates) {
     // ถ้า totalVatCol ไม่ได้ให้ค่า (formula string) ให้คำนวณเอง
     if (b.total === 0) {
       const vatBase = b.cod + b.flashCare + b.boxShield;
-      b.total = parseFloat((b.freight + b.happy + b.remote + b.tourist + b.returnFee + b.pkg + vatBase + (vatBase * VAT_RATE)).toFixed(2));
+      b.total = parseFloat((b.freight + b.happy + b.remote + b.tourist + b.returnFee + b.ontime + b.pkg + vatBase + (vatBase * VAT_RATE)).toFixed(2));
     }
     b.codVat       = b.cod       > 0 ? parseFloat((b.cod       * VAT_RATE).toFixed(2)) : 0;
     b.flashCareVat = b.flashCare > 0 ? parseFloat((b.flashCare * VAT_RATE).toFixed(2)) : 0;
@@ -1228,7 +1230,8 @@ function parseSPXDaily(sheets, targetDates) {
   const codCol     = headers.findIndex(h => /^cod\s*$/i.test(String(h).trim()) && !String(h).toLowerCase().includes('amt'));
   const remoteCol  = headers.findIndex(h => String(h).includes('พื้นที่ห่างไกล'));
   const totalCol      = headers.findIndex(h => String(h).includes('Total+Vat') || String(h).includes('Total รวม Vat'));
-  const returnFeeCol  = headers.findIndex(h => String(h).trim() === 'ค่าตีกลับ' || /return.*fee/i.test(String(h)));
+  const returnFeeCol  = headers.findIndex(h => /return\s*(shipping\s*)?fee/i.test(String(h)) || String(h).trim() === 'ค่าตีกลับ');
+  const insuranceSPXCol = headers.findIndex(h => /insurance\s*fee/i.test(String(h)));
   if (accCol < 0) return [];
 
   // helper: date จาก cell (เหมือน Flash)
@@ -1253,18 +1256,19 @@ function parseSPXDaily(sheets, targetDates) {
     const name = String(row[nameCol] || acc).trim();
     if (!acc || acc === 'nan') continue;
     const key = `${acc}|${rowDate}`;
-    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, returnFee:0, pkg:0, total:0 };
+    if (!grouped[key]) grouped[key] = { acc, name, carrier:'SPX', billDate: rowDate, trackingCount:0, freight:0, cod:0, happy:0, remote:0, tourist:0, returnFee:0, insurance:0, pkg:0, total:0 };
     grouped[key].trackingCount += 1;
     grouped[key].freight += parseFloat(row[freightCol]) || 0;
     grouped[key].cod     += parseFloat(row[codCol])     || 0;
     grouped[key].remote    += parseFloat(row[remoteCol])    || 0;
-    grouped[key].returnFee += returnFeeCol >= 0 ? parseFloat(row[returnFeeCol]) || 0 : 0;
-    grouped[key].total     += parseFloat(row[totalCol])     || 0;
+    grouped[key].returnFee  += returnFeeCol    >= 0 ? parseFloat(row[returnFeeCol])    || 0 : 0;
+    grouped[key].insurance  += insuranceSPXCol >= 0 ? parseFloat(row[insuranceSPXCol]) || 0 : 0;
+    grouped[key].total      += parseFloat(row[totalCol]) || 0;
   }
   // ถ้า total มาจาก formula col ที่ XLSX.js อ่านไม่ได้ ให้คำนวณเอง
   Object.values(grouped).forEach(b => {
-    if (b.total === 0 && (b.freight > 0 || b.remote > 0 || b.returnFee > 0)) {
-      const vatBase = b.cod;
+    if (b.total === 0 && (b.freight > 0 || b.remote > 0 || b.returnFee > 0 || b.insurance > 0)) {
+      const vatBase = b.cod + b.insurance;
       b.total = parseFloat((b.freight + b.remote + b.returnFee + vatBase + (vatBase * 0.07)).toFixed(2));
     }
   });
@@ -1350,6 +1354,7 @@ function calculateBills() {
       remote:        parseFloat(b.remote)     || 0,
       tourist:       parseFloat(b.tourist)    || 0,
       returnFee:     parseFloat(b.returnFee)  || 0,
+      insurance:     parseFloat(b.insurance)  || 0,
       ontime:        parseFloat(b.ontime)     || 0,
       pickup:        parseFloat(b.pickup)     || 0,
       total:         parseFloat((parseFloat(b.total)||0).toFixed(2)),
@@ -1470,6 +1475,7 @@ function calculateBills() {
       paperPod:      b.paperPod   || 0,
       insurance:     b.insurance  || 0,
       returnFee:     b.returnFee  || 0,
+      insurance:     b.insurance  || 0,
       amDeliv:       b.amDeliv    || 0,
       ontime:        b.ontime     || 0,
       pickup:        b.pickup     || 0,
@@ -1585,6 +1591,8 @@ function buildLineItems(b) {
   // Flash
   if ((b.flashCare || 0) > 0) items.push({ label:'Flash Care',                     amount: b.flashCare, vat: true  });
   if ((b.boxShield || 0) > 0) items.push({ label:'Box Shield',                     amount: b.boxShield, vat: true  });
+  // SPX
+  if ((b.insurance || 0) > 0) items.push({ label:'ค่าประกันสินค้า',               amount: b.insurance, vat: true  });
   // DHL & WefastD
   if ((b.returnFee || 0) > 0) items.push({ label:'ค่าตีกลับ',                      amount: b.returnFee, vat: false });
   if ((b.paperPod  || 0) > 0) items.push({ label:'Paper POD Fee',                  amount: b.paperPod,  vat: true  });
