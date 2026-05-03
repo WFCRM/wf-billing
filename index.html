@@ -1345,8 +1345,13 @@ function calculateBills() {
       type:          creditType,
       billDate:      b.billDate || selDate,
       trackingCount: b.trackingCount || 0,
-      freight:       parseFloat(b.freight) || 0,
-      cod:           parseFloat(b.cod)     || 0,
+      freight:       parseFloat(b.freight)    || 0,
+      cod:           parseFloat(b.cod)        || 0,
+      remote:        parseFloat(b.remote)     || 0,
+      tourist:       parseFloat(b.tourist)    || 0,
+      returnFee:     parseFloat(b.returnFee)  || 0,
+      ontime:        parseFloat(b.ontime)     || 0,
+      pickup:        parseFloat(b.pickup)     || 0,
       total:         parseFloat((parseFloat(b.total)||0).toFixed(2)),
     }));
     // แบ่ง chunk ละ 5 รายการ เพื่อไม่ให้ URL ยาวเกิน limit
@@ -2014,10 +2019,22 @@ async function confirmPeriodicBills(creditType) {
   const g = {};
   data.rows.forEach(r => {
     const key = `${r['Sub Account']}|${r['Carrier']}`;
-    if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], type: creditType, freight:0, cod:0, total:0, dates:[] };
-    g[key].freight += parseFloat(r['Freight']||0);
-    g[key].cod     += parseFloat(r['COD']||0);
-    g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
+    if (!g[key]) g[key] = {
+      subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'],
+      carrier: r['Carrier'], type: creditType,
+      trackingCount:0, freight:0, cod:0,
+      remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
+      total:0, dates:[]
+    };
+    g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
+    g[key].freight    += parseFloat(r['Freight']||0);
+    g[key].cod        += parseFloat(r['COD']||0);
+    g[key].remote     += parseFloat(r['Remote']||0);
+    g[key].tourist    += parseFloat(r['Tourist']||0);
+    g[key].returnFee  += parseFloat(r['ReturnFee']||0);
+    g[key].ontime     += parseFloat(r['Ontime']||0);
+    g[key].pickup     += parseFloat(r['Pickup']||0);
+    g[key].total      += parseFloat(r['ยอดรวม VAT']||0);
     if (r['วันที่รับงาน']) g[key].dates.push(r['วันที่รับงาน']);
   });
   const grouped = Object.values(g);
@@ -2040,9 +2057,14 @@ async function confirmPeriodicBills(creditType) {
       fromPeriodic:  true,
       billDate:      selDate,
       trackingCount: bill.trackingCount || 0,
-      freight:       bill.freight,
-      cod:           bill.cod,
-      total:         bill.total,
+      freight:       bill.freight    || 0,
+      cod:           bill.cod        || 0,
+      remote:        bill.remote     || 0,
+      tourist:       bill.tourist    || 0,
+      returnFee:     bill.returnFee  || 0,
+      ontime:        bill.ontime     || 0,
+      pickup:        bill.pickup     || 0,
+      total:         bill.total      || 0,
     }}));
     try {
       const r = await fetch(GAS_URL + '?data=' + payload).then(r=>r.json());
