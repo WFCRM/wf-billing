@@ -2587,7 +2587,11 @@ async function confirmBills() {
   if (!selDate) { alert('กรุณาเลือกวันที่รับงานก่อนเปิดบิลครับ'); return; }
 
   // ─ เช็ค duplicate: ถามก่อนถ้าพบว่าเปิดบิลวันนี้ไปแล้ว ─
-  const dateDisplay = new Date(selDate).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+  // ใช้ dd/MM/yyyy ค.ศ. เสมอ (ไม่ใช้ th-TH locale เพราะจะแปลงปีเป็นพุทธ)
+  const _dd = new Date(selDate);
+  const dateDisplay = String(_dd.getDate()).padStart(2,'0') + '/' +
+                      String(_dd.getMonth()+1).padStart(2,'0') + '/' +
+                      _dd.getFullYear();
   try {
     const dupChecks = await Promise.all(selected.map(async b => {
       const p = encodeURIComponent(JSON.stringify({ action:'checkDuplicate', subAcc: b.subAcc, carrier: b.carrier, billDate: dateDisplay }));
