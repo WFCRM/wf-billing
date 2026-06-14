@@ -1295,7 +1295,7 @@ function parseSPXDaily(sheets, targetDates) {
 }
 
 // ─── Calculate bills ──────────────────────────────────────────
-function calculateBills() {
+async function calculateBills() {
   // ป้องกันกดก่อน CustomerTypes โหลดเสร็จ
   if (!state.customersLoaded) {
     alert('กำลังโหลดข้อมูลลูกค้าจาก Sheet กรุณารอสักครู่แล้วลองอีกครั้งครับ');
