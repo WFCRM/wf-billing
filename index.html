@@ -1437,6 +1437,24 @@ function calculateBills() {
   if (state.files.dhl)       rawBills = rawBills.concat(parseDHLDaily(state.files.dhl.sheets,   targetDates));
   if (state.files.wefast)    rawBills = rawBills.concat(parseWefastDaily(state.files.wefast.sheets, targetDates));
   if (state.files.spx)       rawBills = rawBills.concat(parseSPXDaily(state.files.spx.sheets,   targetDates));
+  // ─── ตรวจหา Sub Account ที่ไม่มีใน CustomerTypes ──────────
+const unknownAccounts = [];
+for (const b of rawBills) {
+  const acc = String(b.acc || '').trim();
+  if (!acc || acc.startsWith('CAZ')) continue; // Flash GAP ข้ามได้
+  const type = lookupType(acc, b.name);
+  if (!type) {
+    const existing = unknownAccounts.find(u => u.acc === acc);
+    if (!existing) unknownAccounts.push({ acc, carrier: b.carrier });
+  }
+}
+if (unknownAccounts.length > 0) {
+  const list = unknownAccounts.map(u => `• ${u.acc} (${u.carrier})`).join('\n');
+  const proceed = await showConfirmModal(
+    `⚠️ พบลูกค้าที่ยังไม่มีในระบบ ${unknownAccounts.length} ราย:\n\n${list}\n\nกรุณาเพิ่มข้อมูลใน Sheet CustomerTypes\n\nต้องการคำนวณต่อโดยข้ามรายการเหล่านี้ไหม?`
+  );
+  if (!proceed) return;
+}
 
   // กำหนด type + กรอง internal
   const bills = [];
