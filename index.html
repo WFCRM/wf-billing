@@ -529,8 +529,9 @@ function getFlowName(subAcc) {
 
   // 4. fallback สุดท้าย: ชื่อจาก CustomerTypes
   const ct = state.customerTypes[acc];
-  if (ct?.name) return ct.name.replace(/^\d+/,'').trim();
-  return acc;
+if (ct?.flowName) return ct.flowName;
+if (ct?.name) return ct.name.replace(/^\d+/,'').trim();
+return acc;
 }
 
 let state = {
