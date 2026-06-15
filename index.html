@@ -1637,17 +1637,20 @@ if (unknownAccounts.length > 0) {
   }
 
   // บันทึก Credit7D สะสมรายวัน (เฉพาะวันที่ไม่ใช่รอบเปิดบิล)
-  if (credit7DRaw.length > 0) {
+ if (credit7DRaw.length > 0) {
     saveAccumulateCredit(credit7DRaw, 'Credit7D').then(() => {
       console.log(`บันทึก Credit7D สะสม ${credit7DRaw.length} รายการ`);
     });
+    const names7d = [...new Set(credit7DRaw.map(b => `• ${getFlowName(b.acc)} (${b.acc})`))].join('\n');
+    alert(`📋 บันทึกลูกค้า Credit 7 วัน สะสม ${credit7DRaw.length} รายการลง Sheet แล้ว\n\n${names7d}\n\nยอดรวมจะถูกเปิดบิลวันจันทร์ถัดไป`);
   }
-
   // บันทึก Credit15D สะสมรายวัน
   if (credit15DRaw.length > 0) {
     saveAccumulateCredit(credit15DRaw, 'Credit15D').then(() => {
       console.log(`บันทึก Credit15D สะสม ${credit15DRaw.length} รายการ`);
     });
+    const names15d = [...new Set(credit15DRaw.map(b => `• ${getFlowName(b.acc)} (${b.acc})`))].join('\n');
+    alert(`📋 บันทึกลูกค้า Credit 15 วัน สะสม ${credit15DRaw.length} รายการลง Sheet แล้ว\n\n${names15d}\n\nยอดรวมจะถูกเปิดบิลวันที่ 1 หรือ 16`);
   }
 
   // อัปเดต badge เตือนว่ามีรายการสะสมรอเปิดบิล
