@@ -985,6 +985,12 @@ function parseNewFormat(sheets, carrier, targetDates) {
     if (!acc || !date) continue;
     if (targetDates && targetDates.length && !targetDates.includes(date)) continue;  // filter รอบวันที่
 
+    // ★ WefastD: บิลเฉพาะบัญชีที่มีใน CustomerTypes (group report รวมลูกค้า WFD ทั้งหมด — คงพฤติกรรม parser เดิม)
+    if (carrier === 'WefastD') {
+      const _t = (typeof state !== 'undefined' && state.customerTypes && state.customerTypes[acc]) ? (state.customerTypes[acc].type || '') : '';
+      if (!_t || _t.indexOf('Internal') !== -1 || _t.indexOf('ไม่เปิดบิล') !== -1) continue;
+    }
+
     const b = {
       acc, name: String(row[iName] || acc).trim(), carrier,
       billDate: date, trackingCount: parseInt(row[iQty] || 0) || 0,
