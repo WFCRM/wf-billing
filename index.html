@@ -2373,6 +2373,33 @@ async function confirmAccumulateBills() {
   renderPeriodic();
 }
 
+// [#4] คำนวณ "รอบเครดิตจริง" จากวันที่มีข้อมูล (แทนการใช้ min-max ของข้อมูล)
+// Credit7D → จันทร์-อาทิตย์ของสัปดาห์นั้น | Credit15D → 1-15 หรือ 16-สิ้นเดือน
+function creditRound(creditType, dateStrs) {
+  function toDate(s){
+    var p1=String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    var p2=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(p1)return new Date(+p1[3],+p1[2]-1,+p1[1]);
+    if(p2)return new Date(+p2[1],+p2[2]-1,+p2[3]);
+    return null;
+  }
+  var ds=dateStrs.map(toDate).filter(Boolean).sort(function(a,b){return a-b;});
+  if(!ds.length)return null;
+  var iso=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  if(creditType==='Credit7D'){
+    var ref=ds[ds.length-1], dow=ref.getDay(), toMon=dow===1?0:(dow===0?-6:1-dow);
+    var mon=new Date(ref); mon.setDate(ref.getDate()+toMon);
+    var sun=new Date(mon); sun.setDate(mon.getDate()+6);
+    return [iso(mon), iso(sun)];
+  }
+  if(creditType==='Credit15D'){
+    var r=ds[0], y=r.getFullYear(), m=r.getMonth(), day=r.getDate();
+    if(day<=15)return [iso(new Date(y,m,1)), iso(new Date(y,m,15))];
+    return [iso(new Date(y,m,16)), iso(new Date(y,m+1,0))];
+  }
+  return [iso(ds[0]), iso(ds[ds.length-1])];
+}
+
 async function confirmPeriodicBills(creditType) {
   // ดึงข้อมูลใหม่จาก Sheet แล้วเปิดบิล
   const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'getAccumulateCredit', creditType })));
@@ -2428,14 +2455,18 @@ async function confirmPeriodicBills(creditType) {
       return s;
     };
 
+    // [#4] ใช้ "รอบเครดิตจริง" แทน min-max ของข้อมูล (เช่น data 25-28 → รอบ 22-28)
+    const _round = creditRound(creditType, sortedDates) || [sortedDates[0], sortedDates[sortedDates.length-1]];
+    const roundFrom = _round[0], roundTo = _round[1];
+
     // dateRange สำหรับ Flowaccount projectName (ปีพุทธ)
-    const dateRange = sortedDates.length > 0
-      ? `งานวันที่ ${fmtDateTH(sortedDates[0])} - ${fmtDateTH(sortedDates[sortedDates.length-1])}//${carrier_short}`
+    const dateRange = roundFrom
+      ? `งานวันที่ ${fmtDateTH(roundFrom)} - ${fmtDateTH(roundTo)}//${carrier_short}`
       : '';
 
     // sheetPeriod สำหรับ Sheet col F (ปีค.ศ. ไม่มีเว้นวรรค)
-    const sheetPeriod = sortedDates.length > 0
-      ? `${fmtDate(sortedDates[0])}-${fmtDate(sortedDates[sortedDates.length-1])}`
+    const sheetPeriod = roundFrom
+      ? `${fmtDate(roundFrom)}-${fmtDate(roundTo)}`
       : '';
 
     const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill: {
