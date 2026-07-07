@@ -1891,7 +1891,7 @@ async function renderTracking() {
     const paid    = rows.filter(r => r['สถานะ'] === 'ชำระแล้ว');
     const overdue = pending.filter(r => r['วันครบกำหนด'] && isOverdueDate(r['วันครบกำหนด']));
 
-    const tabs = ['Flash','DHL','WefastD','SPX'].map(n =>
+    const tabs = ['Flash','DHL','WefastD','SPX','ต่างประเทศ','Other'].map(n =>
       `<div class="tab ${n===carrier?'active':''}" data-carrier="${n}" onclick="state.trackingCarrier='${n}';renderTracking()">${n}</div>`
     ).join('');
 
@@ -1921,14 +1921,23 @@ async function renderTracking() {
         }).join('');
 
     c.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div></div>
-      <button class="btn btn-sm" onclick="syncFlowaccount(this)" style="font-size:11px">
-        🔄 Sync จาก Flowaccount
-      </button>
-      <button class="btn btn-sm" onclick="exportTrackingExcel()" style="font-size:11px;background:var(--green);color:#fff">
-        📥 Export Excel
-      </button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text2)">ดึง BL จาก Flowaccount:</span>
+        <input type="date" id="import-from" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
+        <span style="font-size:11px;color:var(--text3)">–</span>
+        <input type="date" id="import-to" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
+        <button class="btn btn-sm btn-primary" onclick="importFromFlow(this)" style="font-size:11px">⬇ ดึงข้อมูล</button>
+        <span style="font-size:10px;color:var(--text3)">(ไม่เกิน 10 วัน/ครั้ง)</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="syncFlowaccount(this)" style="font-size:11px">
+          🔄 Sync จาก Flowaccount
+        </button>
+        <button class="btn btn-sm" onclick="exportTrackingExcel()" style="font-size:11px;background:var(--green);color:#fff">
+          📥 Export Excel
+        </button>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
       <div class="metric"><div class="metric-label">ทั้งหมด</div><div class="metric-value" style="color:var(--blue)">${rows.length}</div><div class="metric-sub">รายการ</div></div>
@@ -1981,6 +1990,38 @@ function showConfirmModal(msg) {
     box.querySelector('#_modal_ok').onclick     = () => { document.body.removeChild(overlay); resolve(true); };
     box.querySelector('#_modal_cancel').onclick = () => { document.body.removeChild(overlay); resolve(false); };
   });
+}
+
+async function importFromFlow(btn) {
+  const from = document.getElementById('import-from')?.value;
+  const to   = document.getElementById('import-to')?.value;
+  if (!from || !to) { alert('กรุณาเลือกช่วงวันที่ จาก–ถึง ก่อนครับ'); return; }
+  const diffDays = (new Date(to) - new Date(from)) / 86400000;
+  if (diffDays < 0)  { alert('วันที่ "ถึง" ต้องไม่ก่อน "จาก" ครับ'); return; }
+  if (diffDays > 10) { alert('เลือกช่วงได้ไม่เกิน 10 วันต่อครั้งครับ (ดึงหลายรอบได้)'); return; }
+
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> กำลังดึง BL...';
+  try {
+    // 1) ดึง BL ที่ยังไม่มีในชีท (dedup เลข BL)
+    const p = encodeURIComponent(JSON.stringify({ action: 'importFlow', startDate: from, endDate: to }));
+    const r = await fetch(GAS_URL + '?data=' + p).then(r => r.json());
+    if (!r.ok) throw new Error(r.error || 'ดึงข้อมูลไม่สำเร็จ');
+    const s = r.saved || {};
+    // 2) sync เติมเลข Inv + สถานะชำระ ให้อัตโนมัติ
+    btn.innerHTML = '<div class="spinner"></div> กำลังเติม Inv...';
+    await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'syncFlow' }))).then(r => r.json());
+    alert(`✅ ดึง BL ใหม่ ${r.total} ใบ\n\n`
+      + `Flash: ${s.Flash||0}  DHL: ${s.DHL||0}  WefastD: ${s.WefastD||0}  SPX: ${s.SPX||0}  ต่างประเทศ: ${s['ต่างประเทศ']||0}  Other: ${s.Other||0}\n\n`
+      + `เติมเลข Inv (สำหรับใบที่ออกใบกำกับแล้ว) เรียบร้อย`);
+    renderTracking();
+  } catch(e) {
+    alert('เกิดข้อผิดพลาด: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
 }
 
 async function syncFlowaccount(btn) {
