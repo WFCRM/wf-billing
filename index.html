@@ -504,22 +504,26 @@ function getFlowName(subAcc) {
     return '';
   }
 
-  // 1. ลอง state.flowNames ตรงๆ ก่อน (จาก Sheet ชื่อตามใบกำกับ)
-  if (state.flowNames[acc]) return state.flowNames[acc];
-
-  // 2. normalize แล้วลองอีกครั้ง (Flash CZ0108-xxx ↔ CZ-xxx)
   const normAcc = normFlash(acc);
+
+  // 1. ★ CustomerTypes มาก่อน (แหล่งข้อมูลหลักที่ใช้จริง — แก้ชื่อที่นี่แล้วมีผลทันที)
+  const ct  = state.customerTypes[acc];
+  if (ct?.flowName) return ct.flowName;
+  const ctN = normAcc ? state.customerTypes[normAcc] : null;
+  if (ctN?.flowName) return ctN.flowName;
+
+  // 2. fallback: Sheet ชื่อตามใบกำกับ (ชีทเก่า — เผื่อบัญชีที่ยังไม่ได้ย้ายเข้า CustomerTypes)
+  if (state.flowNames[acc]) return state.flowNames[acc];
   if (normAcc && state.flowNames[normAcc]) return state.flowNames[normAcc];
 
   // 3. fallback: ACCOUNT_MAPPING เดิม (hardcode)
   if (ACCOUNT_MAPPING[acc]?.flowName) return ACCOUNT_MAPPING[acc].flowName;
   if (normAcc && ACCOUNT_MAPPING[normAcc]?.flowName) return ACCOUNT_MAPPING[normAcc].flowName;
 
-  // 4. fallback สุดท้าย: ชื่อจาก CustomerTypes
-  const ct = state.customerTypes[acc];
-if (ct?.flowName) return ct.flowName;
-if (ct?.name) return ct.name.replace(/^\d+/,'').trim();
-return acc;
+  // 4. fallback สุดท้าย: ชื่อดิบจาก CustomerTypes
+  if (ct?.name)  return ct.name.replace(/^\d+/,'').trim();
+  if (ctN?.name) return ctN.name.replace(/^\d+/,'').trim();
+  return acc;
 }
 
 let state = {
