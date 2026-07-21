@@ -1442,6 +1442,7 @@ async function calculateBills() {
       billDate:      b.billDate || selDate,
       trackingCount: b.trackingCount || 0,
       freight:       parseFloat(b.freight)    || 0,
+      fuel:          parseFloat(b.fuel)       || 0,   // ★ ค่าน้ำมัน
       cod:           parseFloat(b.cod)        || 0,
       remote:        parseFloat(b.remote)     || 0,
       tourist:       parseFloat(b.tourist)    || 0,
@@ -1645,6 +1646,7 @@ if (unknownAccounts.length > 0) {
       billDate:      b.billDate || selDate,
       trackingCount: b.trackingCount || 0,
       freight:       parseFloat(b.freight)   || 0,
+      fuel:          parseFloat(b.fuel)      || 0,   // ★ ค่าน้ำมัน
       cod:           parseFloat(b.cod)       || 0,
       remote:        parseFloat(b.remote)    || 0,
       tourist:       parseFloat(b.tourist)   || 0,
@@ -2134,9 +2136,10 @@ function renderPeriodicUI(c, rows7d, rows15d, rowsAcc) {
     const g = {};
     rows.forEach(r => {
       const key = `${r['Sub Account']}|${r['Carrier']}`;
-      if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], trackingCount:0, freight:0, cod:0, total:0, dates:[] };
+      if (!g[key]) g[key] = { subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'], carrier: r['Carrier'], trackingCount:0, freight:0, fuel:0, cod:0, total:0, dates:[] };
       g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
       g[key].freight += parseFloat(r['Freight']||0);
+      g[key].fuel    += parseFloat(r['Fuel']||0);   // ★ ค่าน้ำมัน
       g[key].cod     += parseFloat(r['COD']||0);
       g[key].total   += parseFloat(r['ยอดรวม VAT']||0);
       if (r['วันที่รับงาน']) g[key].dates.push(r['วันที่รับงาน']);
@@ -2242,11 +2245,12 @@ function renderAccumulateSection(rowsAcc) {
     if (!g[key]) g[key] = {
       subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'],
       carrier: r['Carrier'], trackingCount:0,
-      freight:0, cod:0, remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
+      freight:0, fuel:0, cod:0, remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
       total:0, dateRange: r['รอบวันที่'] || '', dates:[]
     };
     g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
     g[key].freight    += parseFloat(r['Freight']||0);
+    g[key].fuel       += parseFloat(r['Fuel']||0);   // ★ ค่าน้ำมัน
     g[key].cod        += parseFloat(r['COD']||0);
     g[key].remote     += parseFloat(r['Remote']||0);
     g[key].tourist    += parseFloat(r['Tourist']||0);
@@ -2312,12 +2316,13 @@ async function confirmAccumulateBills() {
     if (!g[key]) g[key] = {
       subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'],
       carrier: r['Carrier'], type: 'เปิดบิลรวม',
-      trackingCount:0, freight:0, cod:0,
+      trackingCount:0, freight:0, fuel:0, cod:0,
       remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
       total:0, dates:[]
     };
     g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
     g[key].freight    += parseFloat(r['Freight']||0);
+    g[key].fuel       += parseFloat(r['Fuel']||0);   // ★ ค่าน้ำมัน
     g[key].cod        += parseFloat(r['COD']||0);
     g[key].remote     += parseFloat(r['Remote']||0);
     g[key].tourist    += parseFloat(r['Tourist']||0);
@@ -2393,6 +2398,7 @@ async function confirmAccumulateBills() {
       billDate:      selDate,
       trackingCount: bill.trackingCount || 0,
       freight:       bill.freight    || 0,
+      fuel:          bill.fuel       || 0,   // ★ ค่าน้ำมัน
       cod:           bill.cod        || 0,
       remote:        bill.remote     || 0,
       tourist:       bill.tourist    || 0,
@@ -2458,12 +2464,13 @@ async function confirmPeriodicBills(creditType) {
     if (!g[key]) g[key] = {
       subAcc: r['Sub Account'], flowName: r['ชื่อลูกค้า (Flowaccount)'],
       carrier: r['Carrier'], type: creditType,
-      trackingCount:0, freight:0, cod:0,
+      trackingCount:0, freight:0, fuel:0, cod:0,
       remote:0, tourist:0, returnFee:0, ontime:0, pickup:0,
       total:0, dates:[]
     };
     g[key].trackingCount += parseInt(r['จำนวนชิ้น']||0);
     g[key].freight    += parseFloat(r['Freight']||0);
+    g[key].fuel       += parseFloat(r['Fuel']||0);   // ★ ค่าน้ำมัน
     g[key].cod        += parseFloat(r['COD']||0);
     g[key].remote     += parseFloat(r['Remote']||0);
     g[key].tourist    += parseFloat(r['Tourist']||0);
@@ -2525,6 +2532,7 @@ async function confirmPeriodicBills(creditType) {
       billDate:      selDate,
       trackingCount: bill.trackingCount || 0,
       freight:       bill.freight    || 0,
+      fuel:          bill.fuel       || 0,   // ★ ค่าน้ำมัน
       cod:           bill.cod        || 0,
       remote:        bill.remote     || 0,
       tourist:       bill.tourist    || 0,
