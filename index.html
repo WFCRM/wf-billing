@@ -398,6 +398,16 @@ const SPECIAL_GROUPS = {
 // ประเภท: ข้ามบิล
 const SKIP_TYPES = ['Internal(ไม่เปิดบิล)','Internal'];
 
+// ─── บัญชีที่ "ไม่เปิดบิล" แต่บันทึกลงชีท Flash GAP แทน ───────
+// ใช้กับบัญชีที่ไปรวมวางบิลกับลูกค้า CAZ (เช่น CZ0108-194 รวมกับ CAZ3461-2)
+// เพิ่มบัญชีใหม่ได้ที่นี่ที่เดียว
+const GAP_EXTRA_ACCOUNTS = ['CZ0108-194'];
+
+function isGapAccount(acc) {
+  const a = String(acc || '').trim();
+  return a.startsWith('CAZ') || GAP_EXTRA_ACCOUNTS.includes(a);
+}
+
 // ─── GAS Web App URL ─────────────────────────────────────────
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzIECCH9jQhFHEFbUNsnlldr78dI2J6Gjvvw2fP0Te9XyrWoC6KlIZ3kUTZ8ONylhVMFA/exec';
 
@@ -1515,7 +1525,7 @@ async function calculateBills() {
 const unknownAccounts = [];
 for (const b of rawBills) {
   const acc = String(b.acc || '').trim();
-  if (!acc || acc.startsWith('CAZ')) continue; // Flash GAP ข้ามได้
+  if (!acc || isGapAccount(acc)) continue; // Flash GAP + บัญชีที่บันทึกชีทอย่างเดียว ข้ามได้
   const type = lookupType(acc, b.name);
   if (!type) {
     const existing = unknownAccounts.find(u => u.acc === acc);
@@ -1544,7 +1554,7 @@ if (unknownAccounts.length > 0) {
     if (SKIP_TYPES.some(s => custType.includes(s))) continue;
 
     // ─── Flash GAP: subAcc ขึ้นต้น CAZ → แยกออก ไม่แสดงในหน้ารายการ
-    if (String(b.acc || '').startsWith('CAZ')) {
+    if (isGapAccount(b.acc)) {
       gapRaw.push({ ...b, type: custType || 'เงินสด' });
       continue;
     }
