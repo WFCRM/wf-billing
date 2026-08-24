@@ -2016,52 +2016,42 @@ async function importFromFlow(btn) {
   if (diffDays < 0)  { alert('วันที่ "ถึง" ต้องไม่ก่อน "จาก" ครับ'); return; }
   if (diffDays > 10) { alert('เลือกช่วงได้ไม่เกิน 10 วันต่อครั้งครับ (ดึงหลายรอบได้)'); return; }
 
-  // helper: fetch แบบมี timeout กันค้าง (GAS ทำงานต่อเบื้องหลังแม้ browser หยุดรอ)
-  async function fetchWithTimeout(url, ms) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), ms);
-    try {
-      const resp = await fetch(url, { signal: ctrl.signal });
-      return await resp.json();
-    } finally { clearTimeout(timer); }
-  }
-
   const orig = btn.innerHTML;
   btn.disabled = true;
 
-  // ─── สเต็ป 1: ดึง BL ───
+  // ─── สเต็ป 1: ดึง BL (สำคัญสุด) ───
   btn.innerHTML = '<div class="spinner"></div> กำลังดึง BL...';
-  let importOk = false, r = {};
+  let r = {};
   try {
     const p = encodeURIComponent(JSON.stringify({ action: 'importFlow', startDate: from, endDate: to }));
-    r = await fetchWithTimeout(GAS_URL + '?data=' + p, 120000);   // รอสูงสุด 2 นาที
+    r = await fetch(GAS_URL + '?data=' + p).then(res => res.json());
     if (!r.ok) throw new Error(r.error || 'ดึงข้อมูลไม่สำเร็จ');
-    importOk = true;
     const s = r.saved || {};
     alert(`✅ ดึง BL ใหม่ ${r.total || 0} ใบ\n\n`
       + `Flash: ${s.Flash||0}  DHL: ${s.DHL||0}  WefastD: ${s.WefastD||0}  SPX: ${s.SPX||0}  ต่างประเทศ: ${s['ต่างประเทศ']||0}  Other: ${s.Other||0}`);
+    renderTracking();
   } catch(e) {
-    if (e.name === 'AbortError') {
-      alert('⏳ การดึงข้อมูลใช้เวลานานกว่าปกติ\n\nระบบยังทำงานอยู่เบื้องหลัง — รอสัก 1 นาทีแล้วกด "รีเฟรช" หรือเช็คในชีทได้เลยครับ');
-    } else {
-      alert('ดึง BL ไม่สำเร็จ: ' + e.message);
-    }
+    alert('❌ ดึง BL ไม่สำเร็จ: ' + e.message + '\n\n(ถ้าเป็น Failed to fetch = ใช้เวลานานเกิน ลองเลือกช่วงวันที่สั้นลง เช่น 2-3 วัน)');
     btn.disabled = false; btn.innerHTML = orig;
-    return;
+    return;   // ดึงไม่สำเร็จ → ไม่ต้อง sync ต่อ
   }
 
-  // ─── สเต็ป 2: เติมเลข Inv (แยกต่างหาก — ถ้าพลาดไม่กระทบการดึง) ───
-  btn.innerHTML = '<div class="spinner"></div> กำลังเติม Inv...';
-  try {
-    await fetchWithTimeout(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'syncFlow', startDate: from, endDate: to })), 120000);
-  } catch(e) {
-    // เติม Inv ไม่สำเร็จ ไม่เป็นไร — กด Sync ใหม่ทีหลังได้
-    console.log('syncFlow timeout/error:', e.message);
-    alert('ℹ️ ดึง BL สำเร็จแล้ว แต่การเติมเลข Inv ยังไม่เสร็จ\n\nกดปุ่ม "Sync จาก Flowaccount" อีกครั้งภายหลังเพื่อเติมเลขใบกำกับครับ');
-  }
-  renderTracking();
-  btn.disabled = false;
+  // ─── สเต็ป 2: เติมเลข Inv (เสริม — ถามก่อนว่าจะทำไหม) ───
   btn.innerHTML = orig;
+  btn.disabled = false;
+  if (confirm('ดึง BL เรียบร้อยแล้ว ✅\n\nต้องการเติมเลขใบกำกับ (Inv) + สถานะชำระ สำหรับช่วงวันที่นี้เลยไหม?\n\n(ถ้าข้อมูลเยอะอาจใช้เวลาสักครู่ — กด "ยกเลิก" แล้วใช้ปุ่ม Sync ทีหลังก็ได้)')) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> กำลังเติม Inv...';
+    try {
+      const sr = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'syncFlow', startDate: from, endDate: to }))).then(res => res.json());
+      alert('✅ เติมเลข Inv + สถานะชำระ เรียบร้อย');
+      renderTracking();
+    } catch(e) {
+      alert('ℹ️ ดึง BL สำเร็จแล้ว (ข้อมูลเข้าชีทครบ)\n\nแต่การเติมเลข Inv ยังไม่เสร็จ — กดปุ่ม "Sync จาก Flowaccount" อีกครั้งภายหลังได้ครับ');
+    }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
 }
 
 async function syncFlowaccount(btn) {
