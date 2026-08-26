@@ -2055,20 +2055,41 @@ async function importFromFlow(btn) {
 }
 
 async function syncFlowaccount(btn) {
+  // ถามช่วงวันที่ก่อน (sync ทั้งหมดทีเดียวจะช้าเกินจน timeout เมื่อข้อมูลเยอะ)
+  const useRange = confirm(
+    'อัปเดตสถานะ/เลข Inv จาก Flowaccount\n\n' +
+    '• กด "ตกลง" = เลือกช่วงวันที่ (แนะนำ — เร็ว ไม่ค้าง)\n' +
+    '• กด "ยกเลิก" = sync ทั้งหมด (ช้า อาจใช้เวลานาน/ค้างถ้าข้อมูลเยอะ)'
+  );
+
+  let from = '', to = '';
+  if (useRange) {
+    from = prompt('Sync ตั้งแต่วันที่ (yyyy-mm-dd):', '2026-08-01');
+    if (!from) return;
+    to = prompt('ถึงวันที่ (yyyy-mm-dd):', '2026-08-31');
+    if (!to) return;
+  }
+
   const orig = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div> กำลัง Sync...';
   try {
-    const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify({ action: 'syncFlow' })));
+    const payload = useRange
+      ? { action: 'syncFlow', startDate: from, endDate: to }
+      : { action: 'syncFlow' };
+    const resp = await fetch(GAS_URL + '?data=' + encodeURIComponent(JSON.stringify(payload)));
     const data = await resp.json();
     if (data.ok) {
-      btn.innerHTML = '✅ Sync เสร็จ (' + data.updated + ' รายการ)';
+      btn.innerHTML = '✅ Sync เสร็จ (' + (data.updated || 0) + ' รายการ)';
       setTimeout(() => renderTracking(), 1000);
     } else {
       btn.innerHTML = '❌ ' + (data.error || 'เกิดข้อผิดพลาด');
     }
   } catch(e) {
-    btn.innerHTML = '❌ ' + e.message;
+    btn.innerHTML = '⏳ ใช้เวลานาน...';
+    alert('การ Sync ใช้เวลานานกว่าที่เบราว์เซอร์รอได้\n\n' +
+          'ระบบอาจยังทำงานอยู่เบื้องหลัง — รอสัก 1-2 นาทีแล้วรีเฟรชหน้าดู\n\n' +
+          'ครั้งหน้าลองเลือกช่วงวันที่สั้นลง (เช่น ทีละ 1 สัปดาห์) จะเร็วกว่าครับ');
   } finally {
     setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 3000);
   }
