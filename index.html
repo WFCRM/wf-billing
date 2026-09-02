@@ -2797,6 +2797,12 @@ function exportExcel() {
 }
 
 async function confirmBills() {
+  // ★ กันกดซ้ำ/กดรัว: ถ้ากำลังเปิดบิลอยู่ ไม่ให้เริ่มรอบใหม่
+  if (state._openingBills) {
+    alert('กำลังเปิดบิลอยู่ กรุณารอให้เสร็จก่อนครับ');
+    return;
+  }
+
   const selected = state.bills.filter(b => state.selectedBills.has(b.id));
   if (!selected.length) { alert('กรุณาเลือกรายการก่อนครับ'); return; }
 
@@ -2859,7 +2865,8 @@ async function confirmBills() {
   // แสดง loading
   const btn = document.querySelector('.btn-green');
   const origText = btn?.innerHTML || '';
-  if (btn) btn.innerHTML = '<div class="spinner"></div> กำลังเปิดบิล...';
+  state._openingBills = true;                    // ★ ล็อกกันกดซ้ำ
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> กำลังเปิดบิล...'; }
 
   try {
     // ส่งทีละรายการเพื่อหลีกเลี่ยง URL length limit
@@ -2911,7 +2918,8 @@ async function confirmBills() {
   } catch(err) {
     alert('เกิดข้อผิดพลาด: ' + err.message + '\n\nตรวจสอบว่า GAS Deploy เป็น Anyone แล้ว');
   } finally {
-    if (btn) btn.innerHTML = origText;
+    state._openingBills = false;                 // ★ ปลดล็อก
+    if (btn) { btn.disabled = false; btn.innerHTML = origText; }
   }
 }
 
