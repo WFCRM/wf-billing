@@ -2871,7 +2871,14 @@ async function confirmBills() {
   try {
     // ส่งทีละรายการเพื่อหลีกเลี่ยง URL length limit
     const results = [];
+    const sentKeys = new Set();   // ★ กันส่งบิลเดิมซ้ำในรอบเดียวกัน
     for (const bill of bills) {
+      const billKey = `${bill.subAcc}|${bill.billDate}|${bill.carrier}|${bill.total}`;
+      if (sentKeys.has(billKey)) {
+        console.log(`⏭ ข้ามบิลซ้ำในรอบเดียวกัน: ${billKey}`);
+        continue;
+      }
+      sentKeys.add(billKey);
       try {
         console.log(`📤 ส่งเปิดบิล [${bill.subAcc}] remote=${bill.remote} freight=${bill.freight} paperPod=${bill.paperPod} cod=${bill.cod}`);
         const payload = encodeURIComponent(JSON.stringify({ action: 'openBill', bill }));
