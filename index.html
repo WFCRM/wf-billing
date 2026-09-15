@@ -967,17 +967,18 @@ function parseNewFormat(sheets, carrier, targetDates) {
   if (iDate < 0 || iCode < 0) return null;        // header ไม่ตรง → fallback
 
   // header (บล็อกราคาขาย) → [field, มี VAT 7%]
+  // [h, field, มี VAT 7%, ยอดในไฟล์รวม VAT มาแล้ว(ต้องถอดก่อน)]
   const FEES = [
-    ['ราคาขาย-ค่าขนส่ง',    'freight',   false],
-    ['ราคาขาย-ห่างไกล',     'remote',    false], // รวมท่องเที่ยวแล้ว
-    ['ราคาขาย-ค่าน้ำมัน',   'fuel',      false], // ★ ใหม่
-    ['ราคาขาย-Happy Return','happy',     false],
-    ['ราคาขาย-ค่าตีกลับ',   'returnFee', false],
-    ['ราคาขาย-Ontime',      'ontime',    false],
-    ['ราคาขาย-Oversize',    'oversize',  false], // * สมมติ 0% (ยังไม่ยืนยัน)
-    ['ราคาขาย-ประกัน',      'insurance', true ],
-    ['ราคาขาย-Box Shield',  'boxShield', true ],
-    ['ราคาขาย-COD Fee',     'cod',       true ],
+    ['ราคาขาย-ค่าขนส่ง',    'freight',   false, false],
+    ['ราคาขาย-ห่างไกล',     'remote',    false, false], // รวมท่องเที่ยวแล้ว
+    ['ราคาขาย-ค่าน้ำมัน',   'fuel',      false, false],
+    ['ราคาขาย-Happy Return','happy',     false, false],
+    ['ราคาขาย-ค่าตีกลับ',   'returnFee', false, false],
+    ['ราคาขาย-Ontime',      'ontime',    false, false],
+    ['ราคาขาย-Oversize',    'oversize',  false, false], // * สมมติ 0% (ยังไม่ยืนยัน)
+    ['ราคาขาย-ประกัน',      'insurance', true,  true ], // ★ ไฟล์ให้ยอดรวม VAT แล้ว → ถอด 7% ก่อน
+    ['ราคาขาย-Box Shield',  'boxShield', true,  false], // ยอดก่อน VAT (ปล่อยเดิม)
+    ['ราคาขาย-COD Fee',     'cod',       true,  false], // ยอดก่อน VAT (มี Vat COD แยก)
     // 'ราคาขาย-Vat COD' → ข้าม (Flowaccount คิด 7% จาก COD Fee เอง)
   ];
 
@@ -1012,9 +1013,11 @@ function parseNewFormat(sheets, carrier, targetDates) {
       insurance:0, boxShield:0, cod:0, oversize:0, tourist:0, pkg:0, flashCare:0,
     };
     let base = 0, vat7 = 0;
-    FEES.forEach(([h, field, isVat]) => {
+    FEES.forEach(([h, field, isVat, vatIncluded]) => {
       const ci = col(h);
-      const v  = ci >= 0 ? r2(f(row[ci])) : 0;
+      let v  = ci >= 0 ? r2(f(row[ci])) : 0;
+      // ★ ถ้ายอดในไฟล์รวม VAT แล้ว (เช่นประกัน) → ถอด VAT ออกก่อน ให้เป็นยอดก่อน VAT
+      if (v > 0 && isVat && vatIncluded) v = r2(v / 1.07);
       b[field] = v; base += v; if (isVat) vat7 += v;
     });
     b.total = r2(base + vat7 * 0.07);            // ★ total รวม VAT (ตรงกับ parser เดิม + GAS)
